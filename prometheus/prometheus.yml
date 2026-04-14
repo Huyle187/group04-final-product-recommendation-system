@@ -1,0 +1,39 @@
+# Prometheus Configuration
+# TODO: ====Complete Prometheus configuration====
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'product-recommendation-system'
+
+# Alertmanager configuration
+# TODO: ====Configure Alertmanager for alert routing====
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - '/etc/prometheus/alerts/*.yml'
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # API metrics
+  - job_name: 'recommendation-api'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['api:8000']
+    scrape_interval: 5s
+    scrape_timeout: 5s
+
+  # TODO: ====Add Node Exporter for system metrics====
+  # - job_name: 'node-exporter'
+  #   static_configs:
+  #     - targets: ['node-exporter:9100']

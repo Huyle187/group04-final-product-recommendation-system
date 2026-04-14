@@ -1,0 +1,42 @@
+# ML Model Alert Rules
+# TODO: ====Define alert rules for model performance====
+
+groups:
+  - name: ml_alerts
+    interval: 30s
+    rules:
+      # TODO: ====High prediction error rate alert====
+      # Alert when prediction failures exceed threshold
+      - alert: HighPredictionErrorRate
+        expr: |
+          (rate(ml_predictions_total{status="error"}[5m]) / rate(ml_predictions_total[5m])) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High ML prediction error rate"
+          description: "Error rate is {{ $value | humanizePercentage }}"
+
+      # TODO: ====Model latency alert====
+      # Alert when model inference is slow
+      - alert: SlowModelInference
+        expr: |
+          histogram_quantile(0.95, rate(ml_prediction_duration_seconds_bucket[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Model inference is slow"
+          description: "P95 prediction latency is {{ $value }}s"
+
+      # TODO: ====Low cache hit rate alert====
+      # Alert when recommendation cache effectiveness is low
+      - alert: LowCacheHitRate
+        expr: |
+          (rate(ml_predictions_cached[5m]) / rate(ml_predictions_total[5m])) < 0.1
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "Low cache hit rate"
+          description: "Cache hit rate is {{ $value | humanizePercentage }}"
