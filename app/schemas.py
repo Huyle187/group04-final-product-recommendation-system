@@ -92,15 +92,15 @@ class HealthResponse(BaseModel):
 
 class ModelInfoResponse(BaseModel):
     """Model information response"""
-    
+
     model_version: str
     model_type: str
     last_updated: Optional[str] = None
-    # TODO: ====Add model metadata (accuracy, data source, etc)====
-    # accuracy: Optional[float] = None
-    # training_samples: Optional[int] = None
-    # feature_count: Optional[int] = None
-    
+    training_users: Optional[int] = None
+    training_items: Optional[int] = None
+    svd_components: Optional[int] = None
+    evaluation_metrics: Optional[Dict[str, float]] = None
+
     class Config:
         protected_namespaces = ()
 

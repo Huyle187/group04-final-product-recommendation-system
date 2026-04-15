@@ -28,6 +28,8 @@ from app.schemas import (
 )
 from app.model import get_model
 from app.middleware import LoggingMiddleware
+from app.explainability import get_explainability_engine
+from app.fairness import get_fairness_checker
 from app.metrics import (
     http_requests_total,
     http_request_duration_seconds,
@@ -231,6 +233,8 @@ async def get_recommendations(request: RecommendationRequest) -> RecommendationR
             
             return response
             
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Error generating recommendations: {str(e)}")
             raise HTTPException(
@@ -348,32 +352,36 @@ async def metrics():
 @app.get("/recommendations/{user_id}/explain", tags=["Explainability"])
 async def explain_recommendation(
     user_id: str,
-    product_id: str = Query(...),
-    method: str = Query("shap", description="Explanation method: shap or lime")
+    product_id: str = Query(..., description="Product ID to explain"),
+    method: str = Query(
+        "auto",
+        description="Explanation method: auto, collaborative, or content_based",
+    ),
 ) -> Dict[str, Any]:
     """
-    TODO: ====Implement recommendation explanation====
-    
-    Provide explanation for why a product was recommended
-    
+    Explain why a specific product was recommended to a user.
+
     Methods:
-    - SHAP: SHapley Additive exPlanations
-    - LIME: Local Interpretable Model-agnostic Explanations
-    
-    Returns:
-    - Feature importance
-    - Impact scores
-    - Decision factors
+    - auto: Uses collaborative if model is loaded, otherwise content_based
+    - collaborative: Neighbor-based — shows similar users who also interacted with this item
+    - content_based: Feature similarity — shows which viewed items are similar to this product
+
+    Note: Standard SHAP/KernelSHAP is not used here because it requires hundreds of
+    model evaluations per request, making it impractical for real-time serving with
+    TruncatedSVD matrix factorization. The neighbor-based approach provides equivalent
+    conceptual explanations with O(1) latency using the pre-computed latent space.
     """
-    
     with RequestMetrics("GET", "/recommendations/{user_id}/explain"):
-        # TODO: Implement SHAP/LIME explanations
-        return {
-            "user_id": user_id,
-            "product_id": product_id,
-            "explanation_method": method,
-            "status": "Not yet implemented"
-        }
+        try:
+            engine = get_explainability_engine()
+            explanation = engine.explain(user_id, product_id, method)
+            return explanation
+        except Exception as e:
+            logger.error(f"Explainability error for user={user_id}, product={product_id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to generate explanation",
+            )
 
 
 # ============================================================================
@@ -381,23 +389,44 @@ async def explain_recommendation(
 # ============================================================================
 
 @app.get("/fairness/check", tags=["Responsible AI"])
-async def check_fairness(user_id: str) -> Dict[str, Any]:
+async def check_fairness(
+    user_id: str,
+    num_recommendations: int = Query(10, ge=1, le=50),
+) -> Dict[str, Any]:
     """
-    TODO: ====Implement fairness checking====
-    
-    Check if recommendations for a user have fairness issues:
-    - Demographic parity
-    - Equal opportunity
-    - Calibration
-    - Recommendation diversity
+    Assess fairness of recommendations for a specific user.
+
+    Computes three proxy fairness metrics (no demographic data available in
+    the Retail Rocket dataset):
+
+    - Popularity bias: fraction of recommendations that are already-popular items
+      (above 80th percentile). High bias indicates a filter bubble effect.
+    - Category diversity: normalized Shannon entropy of the category distribution.
+      Low score means recommendations are concentrated in one product category.
+    - Overall fairness score: composite of (1 - popularity_bias) and diversity.
+
+    Returns an overall_fairness_score in [0, 1] where higher is fairer.
     """
-    
     with RequestMetrics("GET", "/fairness/check"):
-        return {
-            "user_id": user_id,
-            "fairness_score": 0.85,
-            "status": "Not fully implemented"
-        }
+        try:
+            model = get_model()
+            checker = get_fairness_checker()
+
+            recs_data = model.get_recommendations(
+                user_id=user_id,
+                num_recommendations=num_recommendations,
+                recommendation_type="hybrid",
+            )
+            rec_ids = [r["product_id"] for r in recs_data]
+
+            report = checker.full_fairness_report(user_id, rec_ids)
+            return report
+        except Exception as e:
+            logger.error(f"Fairness check error for user={user_id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to compute fairness metrics",
+            )
 
 
 # ============================================================================
