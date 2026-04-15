@@ -17,6 +17,20 @@ import numpy as np
 
 from app.config import settings
 
+from app.config import MODEL_PATH, MODEL_VERSION
+from app.metrics import (
+    PREDICTION_COUNT,
+    PREDICTION_LATENCY,
+    PREDICTION_VALUE,
+    PREDICTION_ERRORS,
+    MODEL_LOADED,
+    MODEL_INFO,
+    MODEL_LAST_RELOAD,
+    BATCH_SIZE,
+)
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 

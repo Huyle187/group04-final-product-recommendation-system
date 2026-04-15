@@ -17,6 +17,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
+from app.middleware import MetricsMiddleware
+from prometheus_client import make_asgi_app
+
 from app.config import settings
 from app.explainability import get_explainability_engine
 from app.fairness import get_fairness_checker
@@ -69,6 +72,14 @@ app.add_middleware(
 
 # Add custom logging middleware
 app.add_middleware(LoggingMiddleware)
+
+
+# Add Metrics middleware
+app.add_middleware(MetricsMiddleware)
+
+# Mount Prometheus metrics endpoint
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
 
 
 # ============================================================================
