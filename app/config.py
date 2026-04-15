@@ -18,7 +18,6 @@ class Settings:
     MODEL_VERSION: str = os.getenv("MODEL_VERSION", "1.0.0")
     MODEL_PATH: str = os.getenv("MODEL_PATH", "./models")
     MODEL_TYPE: str = os.getenv("MODEL_TYPE", "collaborative")
-    # TODO: ====Add model loading configuration====
 
     # Metrics Settings
     METRICS_ENABLED: bool = os.getenv("METRICS_ENABLED", "True").lower() == "true"
@@ -33,15 +32,33 @@ class Settings:
     MAX_RECOMMENDATIONS: int = int(os.getenv("MAX_RECOMMENDATIONS", "100"))
     DEFAULT_RECOMMENDATIONS: int = int(os.getenv("DEFAULT_RECOMMENDATIONS", "5"))
 
-    # TODO: ====Database configuration (if using)==== 
-    # DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL")
+    # MLflow Configuration
+    MLFLOW_TRACKING_URI: str = os.getenv("MLFLOW_TRACKING_URI", "./mlruns")
+    MLFLOW_EXPERIMENT_NAME: str = os.getenv(
+        "MLFLOW_EXPERIMENT_NAME", "retail-rocket-recommendations"
+    )
 
-    # TODO: ====MLflow configuration====
-    # MLFLOW_TRACKING_URI: str = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+    # Responsible AI Settings
+    FAIRNESS_ENABLED: bool = os.getenv("FAIRNESS_ENABLED", "True").lower() == "true"
+    FAIRNESS_POPULARITY_THRESHOLD: float = float(
+        os.getenv("FAIRNESS_POPULARITY_THRESHOLD", "0.3")
+    )
+    MIN_CATEGORY_DIVERSITY: float = float(os.getenv("MIN_CATEGORY_DIVERSITY", "0.3"))
+    EXPLAINABILITY_METHOD: str = os.getenv("EXPLAINABILITY_METHOD", "similarity")
+    MAX_EXPLANATION_FEATURES: int = int(os.getenv("MAX_EXPLANATION_FEATURES", "5"))
 
-    # TODO: ====Responsible AI settings====
-    # FAIRNESS_ENABLED: bool = os.getenv("FAIRNESS_ENABLED", "True").lower() == "true"
-    # EXPLAINABILITY_METHOD: str = os.getenv("EXPLAINABILITY_METHOD", "shap")
+    # Training Data Settings
+    DATA_PATH: str = os.getenv("DATA_PATH", "./data")
+    MIN_USER_INTERACTIONS: int = int(os.getenv("MIN_USER_INTERACTIONS", "5"))
+    MAX_TRAINING_USERS: int = int(os.getenv("MAX_TRAINING_USERS", "50000"))
+
+    # Hybrid Model Weights
+    HYBRID_COLLAB_WEIGHT: float = float(os.getenv("HYBRID_COLLAB_WEIGHT", "0.6"))
+    HYBRID_CONTENT_WEIGHT: float = float(os.getenv("HYBRID_CONTENT_WEIGHT", "0.4"))
+
+    # Collaborative Filtering Hyperparameters
+    SVD_N_COMPONENTS: int = int(os.getenv("SVD_N_COMPONENTS", "50"))
+    SVD_N_ITER: int = int(os.getenv("SVD_N_ITER", "10"))
 
 
 settings = Settings()
