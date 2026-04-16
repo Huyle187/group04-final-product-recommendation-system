@@ -20,14 +20,24 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from app.config import settings
 from app.explainability import get_explainability_engine
 from app.fairness import get_fairness_checker
-from app.metrics import (PredictionMetrics, RequestMetrics, app_info,
-                         http_request_duration_seconds, http_requests_total,
-                         http_response_size_bytes)
+from app.metrics import (
+    PredictionMetrics,
+    RequestMetrics,
+    app_info,
+    http_request_duration_seconds,
+    http_requests_total,
+    http_response_size_bytes,
+)
 from app.middleware import LoggingMiddleware
 from app.model import get_model
-from app.schemas import (ErrorResponse, HealthResponse, ModelInfoResponse,
-                         ProductRecommendation, RecommendationRequest,
-                         RecommendationResponse)
+from app.schemas import (
+    ErrorResponse,
+    HealthResponse,
+    ModelInfoResponse,
+    ProductRecommendation,
+    RecommendationRequest,
+    RecommendationResponse,
+)
 
 # ============================================================================
 # Configuration
