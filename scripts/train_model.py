@@ -58,15 +58,17 @@ class ModelTrainer:
         }
 
         # Model artifacts (populated by train_* methods)
-        self.user_factors: Optional[np.ndarray] = None      # (n_users, n_components)
-        self.item_factors: Optional[np.ndarray] = None      # (n_items, n_components)
-        self.item_similarity_matrix: Optional[np.ndarray] = None  # (n_items, n_items) float32
+        self.user_factors: Optional[np.ndarray] = None  # (n_users, n_components)
+        self.item_factors: Optional[np.ndarray] = None  # (n_items, n_components)
+        self.item_similarity_matrix: Optional[np.ndarray] = (
+            None  # (n_items, n_items) float32
+        )
         self.user_id_to_idx: Dict[str, int] = {}
         self.item_id_to_idx: Dict[str, int] = {}
         self.idx_to_user_id: Dict[int, str] = {}
         self.idx_to_item_id: Dict[int, str] = {}
-        self.item_popularity: Dict[str, int] = {}      # item_id -> interaction count
-        self.item_categories: Dict[str, str] = {}      # item_id -> category string
+        self.item_popularity: Dict[str, int] = {}  # item_id -> interaction count
+        self.item_categories: Dict[str, str] = {}  # item_id -> category string
         self.interaction_matrix: Optional[csr_matrix] = None
         self.metrics: Dict[str, float] = {}
 
@@ -110,9 +112,7 @@ class ModelTrainer:
 
         # 5. Aggregate duplicate (user, item) pairs — sum weights
         interactions = (
-            events.groupby(["visitorid", "itemid"])["weight"]
-            .sum()
-            .reset_index()
+            events.groupby(["visitorid", "itemid"])["weight"].sum().reset_index()
         )
         logger.info(f"Aggregated to {len(interactions):,} user-item pairs")
 
@@ -133,7 +133,9 @@ class ModelTrainer:
                 .index
             )
             interactions = interactions[interactions["visitorid"].isin(top_users)]
-            logger.info(f"Subsampled to {settings.MAX_TRAINING_USERS:,} most-active users")
+            logger.info(
+                f"Subsampled to {settings.MAX_TRAINING_USERS:,} most-active users"
+            )
 
         # 8. Load item properties → build item_categories
         props = self._load_item_properties(data_dir)
@@ -142,10 +144,14 @@ class ModelTrainer:
             props = props[props["itemid"].isin(active_items)]
             cat_props = props[props["property"] == "categoryid"].copy()
             if not cat_props.empty:
-                cat_props["timestamp"] = pd.to_datetime(cat_props["timestamp"], unit="ms")
+                cat_props["timestamp"] = pd.to_datetime(
+                    cat_props["timestamp"], unit="ms"
+                )
                 cat_props = cat_props.sort_values("timestamp").groupby("itemid").last()
                 self.item_categories = cat_props["value"].astype(str).to_dict()
-                logger.info(f"Loaded categories for {len(self.item_categories):,} items")
+                logger.info(
+                    f"Loaded categories for {len(self.item_categories):,} items"
+                )
 
         # 9. Item popularity
         item_counts = interactions.groupby("itemid")["visitorid"].count()
@@ -206,7 +212,9 @@ class ModelTrainer:
         """
         logger.info("Building item content features (TF-IDF)")
 
-        item_ids_ordered = [self.idx_to_item_id[i] for i in range(len(self.item_id_to_idx))]
+        item_ids_ordered = [
+            self.idx_to_item_id[i] for i in range(len(self.item_id_to_idx))
+        ]
 
         texts = []
         item_feature_texts: Dict[str, str] = {}
@@ -274,8 +282,8 @@ class ModelTrainer:
             random_state=42,
         )
 
-        user_factors = svd.fit_transform(train_matrix)   # (n_users, n_components)
-        item_factors = svd.components_.T                  # (n_items, n_components)
+        user_factors = svd.fit_transform(train_matrix)  # (n_users, n_components)
+        item_factors = svd.components_.T  # (n_items, n_components)
 
         # L2-normalize: dot product == cosine similarity
         user_factors = normalize(user_factors, norm="l2")
@@ -378,9 +386,7 @@ class ModelTrainer:
         all_recommended: set = set()
 
         test_by_user: Dict[str, List[str]] = (
-            test_interactions.groupby("visitorid")["itemid"]
-            .apply(list)
-            .to_dict()
+            test_interactions.groupby("visitorid")["itemid"].apply(list).to_dict()
         )
 
         for user_id, true_items in test_by_user.items():
@@ -497,17 +503,19 @@ class ModelTrainer:
         run_name = f"{self.model_type}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
 
         with mlflow.start_run(run_name=run_name):
-            mlflow.log_params({
-                "model_type": self.model_type,
-                "svd_n_components": settings.SVD_N_COMPONENTS,
-                "svd_n_iter": settings.SVD_N_ITER,
-                "min_user_interactions": settings.MIN_USER_INTERACTIONS,
-                "max_training_users": settings.MAX_TRAINING_USERS,
-                "hybrid_collab_weight": settings.HYBRID_COLLAB_WEIGHT,
-                "hybrid_content_weight": settings.HYBRID_CONTENT_WEIGHT,
-                "n_users": len(self.user_id_to_idx),
-                "n_items": len(self.item_id_to_idx),
-            })
+            mlflow.log_params(
+                {
+                    "model_type": self.model_type,
+                    "svd_n_components": settings.SVD_N_COMPONENTS,
+                    "svd_n_iter": settings.SVD_N_ITER,
+                    "min_user_interactions": settings.MIN_USER_INTERACTIONS,
+                    "max_training_users": settings.MAX_TRAINING_USERS,
+                    "hybrid_collab_weight": settings.HYBRID_COLLAB_WEIGHT,
+                    "hybrid_content_weight": settings.HYBRID_CONTENT_WEIGHT,
+                    "n_users": len(self.user_id_to_idx),
+                    "n_items": len(self.item_id_to_idx),
+                }
+            )
 
             if self.metrics:
                 float_metrics = {
@@ -535,6 +543,7 @@ class ModelTrainer:
 # =============================================================================
 # CLI Entry Point
 # =============================================================================
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -625,7 +634,9 @@ def main():
     content_result = None
 
     if args.model in ("collaborative", "hybrid"):
-        collab_result = trainer.train_collaborative_filtering(trainer.interaction_matrix)
+        collab_result = trainer.train_collaborative_filtering(
+            trainer.interaction_matrix
+        )
 
     if args.model in ("content_based", "hybrid"):
         content_result = trainer.train_content_based_model(features)
@@ -634,7 +645,11 @@ def main():
         trainer.train_hybrid_model(collab_result, content_result)
 
     # Step 5: Evaluate
-    if args.evaluate and test_interactions is not None and trainer.user_factors is not None:
+    if (
+        args.evaluate
+        and test_interactions is not None
+        and trainer.user_factors is not None
+    ):
         trainer.evaluate_model(test_interactions, k=10)
 
     # Step 6: Save

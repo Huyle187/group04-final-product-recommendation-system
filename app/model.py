@@ -28,8 +28,8 @@ class RecommendationModel:
         self.model_type = settings.MODEL_TYPE
 
         # Artifacts populated by load_model()
-        self.user_factors: Optional[np.ndarray] = None      # (n_users, n_components)
-        self.item_factors: Optional[np.ndarray] = None      # (n_items, n_components)
+        self.user_factors: Optional[np.ndarray] = None  # (n_users, n_components)
+        self.item_factors: Optional[np.ndarray] = None  # (n_items, n_components)
         self.item_similarity_matrix: Optional[np.ndarray] = None  # (n_items, n_items)
         self.user_id_to_idx: Dict[str, int] = {}
         self.item_id_to_idx: Dict[str, int] = {}
@@ -37,7 +37,7 @@ class RecommendationModel:
         self.idx_to_item_id: Dict[int, str] = {}
         self.item_popularity: Dict[str, int] = {}
         self.item_categories: Dict[str, str] = {}
-        self.interaction_matrix = None   # csr_matrix
+        self.interaction_matrix = None  # csr_matrix
         self._model_metadata: Dict[str, Any] = {}
 
         # LRU recommendation cache
@@ -143,9 +143,13 @@ class RecommendationModel:
             return self._mock_recommendations(num_recommendations)
 
         if recommendation_type == "collaborative":
-            recs = self._collaborative_recommendations(user_id, num_recommendations, filters)
+            recs = self._collaborative_recommendations(
+                user_id, num_recommendations, filters
+            )
         elif recommendation_type == "content_based":
-            recs = self._content_based_recommendations(user_id, num_recommendations, filters)
+            recs = self._content_based_recommendations(
+                user_id, num_recommendations, filters
+            )
         elif recommendation_type == "hybrid":
             recs = self._hybrid_recommendations(user_id, num_recommendations, filters)
         else:
@@ -165,8 +169,7 @@ class RecommendationModel:
     ) -> Dict[str, List[Dict]]:
         """Generate recommendations for multiple users."""
         return {
-            uid: self.get_recommendations(uid, num_recommendations)
-            for uid in user_ids
+            uid: self.get_recommendations(uid, num_recommendations) for uid in user_ids
         }
 
     # =========================================================================
@@ -210,10 +213,13 @@ class RecommendationModel:
             item_id = self.idx_to_item_id[idx]
             raw = float(scores[idx])
             norm_score = min(1.0, max(0.0, raw / max_score if max_score > 0 else 0.5))
-            results.append(self._build_rec(
-                item_id, norm_score,
-                "Users with similar behavior also interacted with this item",
-            ))
+            results.append(
+                self._build_rec(
+                    item_id,
+                    norm_score,
+                    "Users with similar behavior also interacted with this item",
+                )
+            )
 
         return results
 
@@ -273,10 +279,13 @@ class RecommendationModel:
             raw = float(agg_scores[idx])
             # cosine sim in [0, 1] since TF-IDF vectors are non-negative
             norm_score = min(1.0, max(0.0, raw))
-            results.append(self._build_rec(
-                item_id, norm_score,
-                "Similar item features to products you've viewed",
-            ))
+            results.append(
+                self._build_rec(
+                    item_id,
+                    norm_score,
+                    "Similar item features to products you've viewed",
+                )
+            )
 
         return results if results else self._popular_items_fallback(n, filters)
 
@@ -287,7 +296,7 @@ class RecommendationModel:
         Weighted blend of collaborative and content-based scores.
         Over-fetches from each strategy then merges.
         """
-        w_c = settings.HYBRID_COLLAB_WEIGHT    # default 0.6
+        w_c = settings.HYBRID_COLLAB_WEIGHT  # default 0.6
         w_cb = settings.HYBRID_CONTENT_WEIGHT  # default 0.4
 
         k = min(n * 3, 50)
@@ -297,13 +306,21 @@ class RecommendationModel:
         combined: Dict[str, Dict] = {}
         for rec in collab_recs:
             pid = rec["product_id"]
-            combined[pid] = {"collab_score": rec["score"], "content_score": 0.0, "rec": rec}
+            combined[pid] = {
+                "collab_score": rec["score"],
+                "content_score": 0.0,
+                "rec": rec,
+            }
         for rec in content_recs:
             pid = rec["product_id"]
             if pid in combined:
                 combined[pid]["content_score"] = rec["score"]
             else:
-                combined[pid] = {"collab_score": 0.0, "content_score": rec["score"], "rec": rec}
+                combined[pid] = {
+                    "collab_score": 0.0,
+                    "content_score": rec["score"],
+                    "rec": rec,
+                }
 
         scored = []
         for pid, data in combined.items():
@@ -348,9 +365,7 @@ class RecommendationModel:
     # Helpers
     # =========================================================================
 
-    def _build_rec(
-        self, item_id: str, score: float, reason: str
-    ) -> Dict[str, Any]:
+    def _build_rec(self, item_id: str, score: float, reason: str) -> Dict[str, Any]:
         return {
             "product_id": item_id,
             "product_name": f"Product {item_id}",
@@ -388,13 +403,15 @@ class RecommendationModel:
             "model_type": self.model_type,
         }
         if self._model_metadata:
-            info.update({
-                "last_updated": self._model_metadata.get("created_at"),
-                "training_users": self._model_metadata.get("n_users"),
-                "training_items": self._model_metadata.get("n_items"),
-                "svd_components": self._model_metadata.get("svd_n_components"),
-                "evaluation_metrics": self._model_metadata.get("metrics", {}),
-            })
+            info.update(
+                {
+                    "last_updated": self._model_metadata.get("created_at"),
+                    "training_users": self._model_metadata.get("n_users"),
+                    "training_items": self._model_metadata.get("n_items"),
+                    "svd_components": self._model_metadata.get("svd_n_components"),
+                    "evaluation_metrics": self._model_metadata.get("metrics", {}),
+                }
+            )
         return info
 
 

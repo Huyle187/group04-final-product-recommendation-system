@@ -42,7 +42,7 @@ events_schema = DataFrameSchema(
             nullable=False,
             checks=Check.isin(["view", "addtocart", "transaction"]),
         ),
-        "itemid": Column(float, nullable=True),        # null for some events
+        "itemid": Column(float, nullable=True),  # null for some events
         "transactionid": Column(float, nullable=True),
     },
     coerce=True,
@@ -305,7 +305,9 @@ class TestDataCompleteness:
             }
         )
         duplicates = interactions.duplicated(subset=["visitorid", "itemid"])
-        assert not duplicates.any(), "Duplicate (user, item) pairs found after aggregation"
+        assert (
+            not duplicates.any()
+        ), "Duplicate (user, item) pairs found after aggregation"
 
     def test_weight_values_are_finite(self):
         """No weight value may be NaN or infinite."""
@@ -317,9 +319,9 @@ class TestDataCompleteness:
         item_id_to_idx = {"i1": 0, "i2": 1, "i3": 2}
         idx_to_item_id = {v: k for k, v in item_id_to_idx.items()}
         for item_id, idx in item_id_to_idx.items():
-            assert idx_to_item_id[idx] == item_id, (
-                f"Inconsistent mapping: {item_id} -> {idx} -> {idx_to_item_id[idx]}"
-            )
+            assert (
+                idx_to_item_id[idx] == item_id
+            ), f"Inconsistent mapping: {item_id} -> {idx} -> {idx_to_item_id[idx]}"
 
     def test_user_id_index_maps_are_consistent(self):
         """user_id_to_idx and idx_to_user_id must be exact inverse mappings."""

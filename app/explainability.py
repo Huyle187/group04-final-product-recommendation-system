@@ -96,9 +96,9 @@ class ExplainabilityEngine:
         item_idx = m.item_id_to_idx[product_id]
 
         # Cosine similarity to all users (factors are L2-normalized)
-        user_vec = m.user_factors[u_idx]             # (n_components,)
-        all_sims = m.user_factors @ user_vec          # (n_users,)
-        all_sims[u_idx] = -1.0                        # exclude self
+        user_vec = m.user_factors[u_idx]  # (n_components,)
+        all_sims = m.user_factors @ user_vec  # (n_users,)
+        all_sims[u_idx] = -1.0  # exclude self
 
         top_neighbor_indices = np.argsort(all_sims)[::-1][:n_neighbors]
 
@@ -160,7 +160,10 @@ class ExplainabilityEngine:
         m = self.model
 
         if m.item_similarity_matrix is None:
-            return {"method": "content_similarity", "error": "Content model not available"}
+            return {
+                "method": "content_similarity",
+                "error": "Content model not available",
+            }
 
         if user_id not in m.user_id_to_idx:
             return {
@@ -212,19 +215,22 @@ class ExplainabilityEngine:
         for pos in top_seen_pos:
             seen_item_id = m.idx_to_item_id.get(valid_seen[pos])
             if seen_item_id:
-                most_similar_seen.append({
-                    "item_id": seen_item_id,
-                    "similarity": round(float(sims_to_target[pos]), 4),
-                    "category": m.item_categories.get(seen_item_id),
-                })
+                most_similar_seen.append(
+                    {
+                        "item_id": seen_item_id,
+                        "similarity": round(float(sims_to_target[pos]), 4),
+                        "category": m.item_categories.get(seen_item_id),
+                    }
+                )
 
         # Category match check
         product_category = m.item_categories.get(product_id)
         user_categories = {
-            m.item_categories.get(m.idx_to_item_id.get(i))
-            for i in seen_indices
+            m.item_categories.get(m.idx_to_item_id.get(i)) for i in seen_indices
         }
-        category_match = product_category in user_categories if product_category else False
+        category_match = (
+            product_category in user_categories if product_category else False
+        )
 
         avg_sim = float(np.mean(sims_to_target)) if len(sims_to_target) > 0 else 0.0
 
@@ -293,5 +299,6 @@ def get_explainability_engine() -> ExplainabilityEngine:
     global _engine_instance
     if _engine_instance is None:
         from app.model import get_model
+
         _engine_instance = ExplainabilityEngine(get_model())
     return _engine_instance

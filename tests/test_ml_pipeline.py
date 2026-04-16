@@ -26,7 +26,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from scripts.train_model import ModelTrainer
 
-
 # =============================================================================
 # Shared Fixtures
 # =============================================================================
@@ -41,14 +40,38 @@ def sample_interactions() -> pd.DataFrame:
     return pd.DataFrame(
         {
             "visitorid": [
-                "u1", "u1", "u1", "u1", "u1",
-                "u2", "u2", "u2", "u2", "u2",
-                "u3", "u3", "u3", "u3", "u3",
+                "u1",
+                "u1",
+                "u1",
+                "u1",
+                "u1",
+                "u2",
+                "u2",
+                "u2",
+                "u2",
+                "u2",
+                "u3",
+                "u3",
+                "u3",
+                "u3",
+                "u3",
             ],
             "itemid": [
-                "i1", "i2", "i3", "i4", "i5",
-                "i2", "i3", "i4", "i5", "i6",
-                "i1", "i3", "i5", "i6", "i7",
+                "i1",
+                "i2",
+                "i3",
+                "i4",
+                "i5",
+                "i2",
+                "i3",
+                "i4",
+                "i5",
+                "i6",
+                "i1",
+                "i3",
+                "i5",
+                "i6",
+                "i7",
             ],
             "weight": [1, 3, 1, 1, 5, 1, 1, 3, 1, 1, 1, 1, 3, 1, 1],
         }
@@ -245,36 +268,28 @@ class TestEvaluationMetrics:
     def test_recall_at_k_range(self, trainer_with_data):
         """Recall@k must be in [0.0, 1.0]."""
         t = self._trained_trainer(trainer_with_data)
-        test_df = pd.DataFrame(
-            {"visitorid": ["u1"], "itemid": ["i6"], "weight": [1.0]}
-        )
+        test_df = pd.DataFrame({"visitorid": ["u1"], "itemid": ["i6"], "weight": [1.0]})
         metrics = t.evaluate_model(test_df, k=5)
         assert 0.0 <= metrics["recall@5"] <= 1.0
 
     def test_ndcg_at_k_range(self, trainer_with_data):
         """NDCG@k must be in [0.0, 1.0]."""
         t = self._trained_trainer(trainer_with_data)
-        test_df = pd.DataFrame(
-            {"visitorid": ["u1"], "itemid": ["i6"], "weight": [1.0]}
-        )
+        test_df = pd.DataFrame({"visitorid": ["u1"], "itemid": ["i6"], "weight": [1.0]})
         metrics = t.evaluate_model(test_df, k=5)
         assert 0.0 <= metrics["ndcg@5"] <= 1.0
 
     def test_catalog_coverage_range(self, trainer_with_data):
         """Catalog coverage must be in [0.0, 1.0]."""
         t = self._trained_trainer(trainer_with_data)
-        test_df = pd.DataFrame(
-            {"visitorid": ["u1"], "itemid": ["i6"], "weight": [1.0]}
-        )
+        test_df = pd.DataFrame({"visitorid": ["u1"], "itemid": ["i6"], "weight": [1.0]})
         metrics = t.evaluate_model(test_df, k=3)
         assert 0.0 <= metrics["catalog_coverage"] <= 1.0
 
     def test_metrics_dict_has_required_keys(self, trainer_with_data):
         """evaluate_model must return all expected metric keys."""
         t = self._trained_trainer(trainer_with_data)
-        test_df = pd.DataFrame(
-            {"visitorid": ["u1"], "itemid": ["i6"], "weight": [1.0]}
-        )
+        test_df = pd.DataFrame({"visitorid": ["u1"], "itemid": ["i6"], "weight": [1.0]})
         metrics = t.evaluate_model(test_df, k=10)
         required = {"precision@10", "recall@10", "ndcg@10", "catalog_coverage"}
         assert required.issubset(metrics.keys())

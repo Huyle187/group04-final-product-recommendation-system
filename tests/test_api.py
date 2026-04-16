@@ -197,9 +197,9 @@ class TestDataQuality:
         response = client.post("/recommendations", json=payload)
         assert response.status_code == 200
         for rec in response.json()["recommendations"]:
-            assert 0.0 <= rec["score"] <= 1.0, (
-                f"Score out of range: {rec['score']} for product {rec['product_id']}"
-            )
+            assert (
+                0.0 <= rec["score"] <= 1.0
+            ), f"Score out of range: {rec['score']} for product {rec['product_id']}"
 
     def test_product_ids_not_empty(self):
         """Each recommendation must have a non-empty product_id."""
@@ -252,9 +252,9 @@ class TestDataQuality:
         response = client.post("/recommendations", json=payload)
         assert response.status_code == 200
         for rec in response.json()["recommendations"]:
-            assert isinstance(rec["score"], float), (
-                f"Expected float score, got {type(rec['score'])}"
-            )
+            assert isinstance(
+                rec["score"], float
+            ), f"Expected float score, got {type(rec['score'])}"
 
 
 # ============================================================================
@@ -288,7 +288,9 @@ class TestModelValidation:
         response = client.post("/recommendations", json=payload)
         assert response.status_code == 200
         recs = response.json()["recommendations"]
-        assert len(recs) > 0, "Cold-start user should receive popularity-ranked fallback"
+        assert (
+            len(recs) > 0
+        ), "Cold-start user should receive popularity-ranked fallback"
 
     def test_model_recommendation_quality_no_duplicates(self):
         """Recommended items within a single response must be unique."""
@@ -300,7 +302,9 @@ class TestModelValidation:
         response = client.post("/recommendations", json=payload)
         assert response.status_code == 200
         product_ids = [r["product_id"] for r in response.json()["recommendations"]]
-        assert len(product_ids) == len(set(product_ids)), "Duplicate recommendations found"
+        assert len(product_ids) == len(
+            set(product_ids)
+        ), "Duplicate recommendations found"
 
     def test_model_info_has_version(self):
         """Model info endpoint must return a non-null model_version."""
@@ -322,9 +326,7 @@ class TestModelValidation:
         response = client.post("/recommendations", json=payload)
         elapsed_ms = (time.time() - start) * 1000
         assert response.status_code == 200
-        assert elapsed_ms < 200, (
-            f"Latency {elapsed_ms:.1f}ms exceeds 200ms threshold"
-        )
+        assert elapsed_ms < 200, f"Latency {elapsed_ms:.1f}ms exceeds 200ms threshold"
 
 
 # ============================================================================
@@ -354,9 +356,9 @@ class TestPerformance:
         response = client.post("/recommendations", json=payload)
         elapsed_ms = (time.time() - start) * 1000
         assert response.status_code == 200
-        assert elapsed_ms < 1000, (
-            f"Recommendation took {elapsed_ms:.1f}ms (limit: 1000ms)"
-        )
+        assert (
+            elapsed_ms < 1000
+        ), f"Recommendation took {elapsed_ms:.1f}ms (limit: 1000ms)"
 
     def test_cached_recommendation_faster(self):
         """Second identical request must benefit from LRU cache and complete in < 50 ms."""
@@ -372,6 +374,6 @@ class TestPerformance:
         response = client.post("/recommendations", json=payload)
         elapsed_ms = (time.time() - start) * 1000
         assert response.status_code == 200
-        assert elapsed_ms < 50, (
-            f"Cached recommendation took {elapsed_ms:.1f}ms (limit: 50ms)"
-        )
+        assert (
+            elapsed_ms < 50
+        ), f"Cached recommendation took {elapsed_ms:.1f}ms (limit: 50ms)"

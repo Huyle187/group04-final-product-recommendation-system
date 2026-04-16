@@ -68,9 +68,7 @@ class FairnessChecker:
     # Popularity Bias
     # =========================================================================
 
-    def check_popularity_bias(
-        self, recommended_item_ids: List[str]
-    ) -> Dict[str, Any]:
+    def check_popularity_bias(self, recommended_item_ids: List[str]) -> Dict[str, Any]:
         """
         Measure the fraction of recommendations that are "popular" items
         (above the 80th popularity percentile in the training set).
@@ -96,7 +94,10 @@ class FairnessChecker:
         is_biased = popularity_fraction > settings.FAIRNESS_POPULARITY_THRESHOLD
 
         pop_scores = np.array(
-            [float(self.model.item_popularity.get(iid, 0)) for iid in recommended_item_ids]
+            [
+                float(self.model.item_popularity.get(iid, 0))
+                for iid in recommended_item_ids
+            ]
         )
         gini = self._gini_coefficient(pop_scores)
 
@@ -151,7 +152,9 @@ class FairnessChecker:
             )
             entropy = -np.sum(probs * np.log(probs + 1e-12))
             max_entropy = np.log(n_cats)
-            entropy_normalized = float(entropy / max_entropy) if max_entropy > 0 else 0.0
+            entropy_normalized = (
+                float(entropy / max_entropy) if max_entropy > 0 else 0.0
+            )
 
         is_diverse = entropy_normalized >= settings.MIN_CATEGORY_DIVERSITY
 
@@ -298,5 +301,6 @@ def get_fairness_checker() -> FairnessChecker:
     global _checker_instance
     if _checker_instance is None:
         from app.model import get_model
+
         _checker_instance = FairnessChecker(get_model())
     return _checker_instance
