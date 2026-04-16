@@ -518,8 +518,11 @@ class ModelTrainer:
             )
 
             if self.metrics:
+                # MLflow forbids '@' in metric names — replace with '_at_'
                 float_metrics = {
-                    k: v for k, v in self.metrics.items() if isinstance(v, float)
+                    k.replace("@", "_at_"): v
+                    for k, v in self.metrics.items()
+                    if isinstance(v, float)
                 }
                 mlflow.log_metrics(float_metrics)
 
