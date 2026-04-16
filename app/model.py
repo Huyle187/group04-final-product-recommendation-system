@@ -15,19 +15,10 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-from app.config import settings
-
-from app.config import MODEL_PATH, MODEL_VERSION
-from app.metrics import (
-    PREDICTION_COUNT,
-    PREDICTION_LATENCY,
-    PREDICTION_VALUE,
-    PREDICTION_ERRORS,
-    MODEL_LOADED,
-    MODEL_INFO,
-    MODEL_LAST_RELOAD,
-    BATCH_SIZE,
-)
+from app.config import MODEL_PATH, MODEL_VERSION, settings
+from app.metrics import (BATCH_SIZE, MODEL_INFO, MODEL_LAST_RELOAD,
+                         MODEL_LOADED, PREDICTION_COUNT, PREDICTION_ERRORS,
+                         PREDICTION_LATENCY, PREDICTION_VALUE)
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
