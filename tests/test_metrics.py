@@ -6,13 +6,10 @@ Test that metrics are properly collected and formatted
 
 import pytest
 from prometheus_client import REGISTRY
-from app.metrics import (
-    http_requests_total,
-    http_request_duration_seconds,
-    ml_predictions_total,
-    RequestMetrics,
-    PredictionMetrics,
-)
+
+from app.metrics import (PredictionMetrics, RequestMetrics,
+                         http_request_duration_seconds, http_requests_total,
+                         ml_predictions_total)
 
 # ============================================================================
 # Metric Context Manager Tests

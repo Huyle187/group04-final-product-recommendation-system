@@ -8,10 +8,10 @@ Usage:
 """
 
 import argparse
-import time
 import json
-from typing import List, Dict
 import logging
+import time
+from typing import Dict, List
 
 # Configure logging
 logging.basicConfig(
@@ -43,8 +43,9 @@ def load_test_with_requests(
     """
 
     try:
-        import requests
         from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        import requests
     except ImportError:
         logger.error("Please install: pip install requests")
         return

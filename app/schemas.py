@@ -2,7 +2,8 @@
 Pydantic models for request/response validation
 """
 
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 # ============================================================================

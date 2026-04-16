@@ -2,8 +2,9 @@
 Prometheus metrics collection module
 """
 
-from prometheus_client import Counter, Histogram, Gauge
 import time
+
+from prometheus_client import Counter, Gauge, Histogram
 
 # ============================================================================
 # HTTP Metrics (API performance)

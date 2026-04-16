@@ -15,14 +15,13 @@ for every stage of the pipeline.
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import numpy as np
 import pandas as pd
 import pandera as pa
 import pytest
 from pandera import Check, Column, DataFrameSchema
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 
 # =============================================================================
 # Pandera Schemas
@@ -368,6 +367,7 @@ class TestAPIResponseDataQuality:
     def test_api_response_passes_pandera_schema(self):
         """Recommendation API response must satisfy the Pandera schema."""
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         client = TestClient(app)

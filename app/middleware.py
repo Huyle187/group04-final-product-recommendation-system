@@ -2,9 +2,10 @@
 Custom middleware for the FastAPI application
 """
 
-import time
 import logging
+import time
 from typing import Callable
+
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp

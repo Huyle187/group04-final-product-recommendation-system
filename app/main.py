@@ -10,34 +10,24 @@ This module defines all API endpoints for the recommendation system:
 
 import logging
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, HTTPException, Query, status
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from fastapi.responses import JSONResponse
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from app.config import settings
-from app.schemas import (
-    RecommendationRequest,
-    RecommendationResponse,
-    ProductRecommendation,
-    HealthResponse,
-    ModelInfoResponse,
-    ErrorResponse,
-)
-from app.model import get_model
-from app.middleware import LoggingMiddleware
 from app.explainability import get_explainability_engine
 from app.fairness import get_fairness_checker
-from app.metrics import (
-    http_requests_total,
-    http_request_duration_seconds,
-    http_response_size_bytes,
-    app_info,
-    RequestMetrics,
-    PredictionMetrics,
-)
+from app.metrics import (PredictionMetrics, RequestMetrics, app_info,
+                         http_request_duration_seconds, http_requests_total,
+                         http_response_size_bytes)
+from app.middleware import LoggingMiddleware
+from app.model import get_model
+from app.schemas import (ErrorResponse, HealthResponse, ModelInfoResponse,
+                         ProductRecommendation, RecommendationRequest,
+                         RecommendationResponse)
 
 # ============================================================================
 # Configuration
