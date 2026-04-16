@@ -25,7 +25,8 @@ RUN pip install --upgrade pip && \
 
 # Copy application code
 COPY app/ ./app/
-COPY models/ ./models/
+# models/ is mounted as a volume at runtime; create empty dir for fallback (mock mode)
+RUN mkdir -p ./models
 
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser && \

@@ -1,0 +1,11 @@
+{
+  "num_users": 39635,
+  "num_items": 92146,
+  "num_interactions": 427236,
+  "sparsity": 0.9998830197647821,
+  "event_type_counts": {
+    "view": 2664312,
+    "addtocart": 69332,
+    "transaction": 22457
+  }
+}
