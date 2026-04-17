@@ -12,7 +12,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 from starlette.types import ASGIApp
 
-from app.metrics import REQUEST_COUNT, REQUEST_LATENCY, RequestMetrics
+from app.metrics import http_requests_total, http_request_duration_seconds, RequestMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -51,15 +51,13 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         method = request.method
         status = response.status_code
 
-        # TODO 5: Record the request count metric
-        # Only record if REQUEST_COUNT is defined
-        if REQUEST_COUNT is not None:
-            REQUEST_COUNT.labels(method=method, endpoint=endpoint, status=status).inc()
+        # TODO: Record the request count metric
+        if http_requests_total is not None:
+            http_requests_total.labels(method=method, endpoint=endpoint, status=status).inc()
 
-        # TODO 6: Record the request latency metric
-        # Only record if REQUEST_LATENCY is defined
-        if REQUEST_LATENCY is not None:
-            REQUEST_LATENCY.labels(method=method, endpoint=endpoint).observe(duration)
+        # TODO: Record the request latency metric
+        if http_request_duration_seconds is not None:
+            http_request_duration_seconds.labels(method=method, endpoint=endpoint).observe(duration)
 
         # TODO 7: Return the response
         return response
@@ -105,8 +103,8 @@ def check_metrics_middleware_ready() -> dict:
         Dictionary with status of each metric
     """
     return {
-        "request_count_ready": REQUEST_COUNT is not None,
-        "request_latency_ready": REQUEST_LATENCY is not None,
+        "request_count_ready": http_requests_total is not None,
+        "request_latency_ready": http_request_duration_seconds is not None,
         "middleware_functional": True,
     }
 

@@ -6,7 +6,7 @@ groups:
     interval: 30s
     rules:
 
-      # TODO: Model Not Loaded Alert
+      # Model Not Loaded Alert
       # Trigger when the ML model is not loaded
       # Severity: critical
       
@@ -19,7 +19,7 @@ groups:
           summary: "ML Model not loaded"
           description: "The ML model is not loaded on the API server"
 
-      # TODO: Prediction Latency High Alert
+      # Prediction Latency High Alert
       # Trigger when P95 prediction latency exceeds 100ms
       # Severity: warning
       
@@ -35,7 +35,7 @@ groups:
           summary: "ML prediction latency is high"
           description: "P95 prediction latency is {{ $value }}s (threshold: 0.1s)"
 
-      # TODO: Low Prediction Volume Alert
+      # Low Prediction Volume Alert
       # Trigger when prediction rate drops significantly
       # Could indicate service issues or traffic problems
       # Severity: warning
@@ -49,7 +49,7 @@ groups:
           summary: "Low prediction volume"
           description: "Prediction rate is {{ $value }}/s, unusually low"
 
-      # TODO: Prediction Distribution Anomaly Alert
+      # Prediction Distribution Anomaly Alert
       # Trigger when median prediction shifts significantly from historical
       # This is a simple drift detection mechanism
       # Severity: warning
@@ -67,7 +67,7 @@ groups:
           summary: "Prediction distribution shift detected"
           description: "Median prediction has shifted by more than 0.5 in 24h"
 
-      # TODO: Model Stale Alert (BONUS)
+      # Model Stale Alert
       # Trigger when model hasn't been reloaded in a long time (e.g., 7 days)
       # Severity: info
       
@@ -80,7 +80,7 @@ groups:
           summary: "ML model may be stale"
           description: "Model hasn't been reloaded in {{ $value | humanizeDuration }}"
 
-      # TODO: ====High prediction error rate alert====
+      # High prediction error rate alert
       # Alert when prediction failures exceed threshold
       - alert: HighPredictionErrorRate
         expr: |
@@ -92,7 +92,7 @@ groups:
           summary: "High ML prediction error rate"
           description: "Error rate is {{ $value | humanizePercentage }}"
 
-      # TODO: ====Model latency alert====
+      # Model latency alert
       # Alert when model inference is slow
       - alert: SlowModelInference
         expr: |
@@ -104,7 +104,7 @@ groups:
           summary: "Model inference is slow"
           description: "P95 prediction latency is {{ $value }}s"
 
-      # TODO: ====Low cache hit rate alert====
+      # Low cache hit rate alert
       # Alert when recommendation cache effectiveness is low
       - alert: LowCacheHitRate
         expr: |

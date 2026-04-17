@@ -20,47 +20,20 @@ class TestMetricDefinitions:
     """Test that metrics are properly defined."""
 
     def test_request_count_defined(self):
-        """Test REQUEST_COUNT is defined."""
-        assert REQUEST_COUNT is not None
+        """Test http_requests_total is defined."""
+        assert http_requests_total is not None
         # Check it's a Counter
-        assert hasattr(REQUEST_COUNT, "inc")
+        assert hasattr(http_requests_total, "inc")
 
     def test_request_latency_defined(self):
-        """Test REQUEST_LATENCY is defined."""
-        # This test will fail until students implement the metric
-        if REQUEST_LATENCY is None:
-            pytest.skip("REQUEST_LATENCY not implemented yet")
-        assert hasattr(REQUEST_LATENCY, "observe")
+        """Test http_request_duration_seconds is defined."""
+        assert http_request_duration_seconds is not None
+        assert hasattr(http_request_duration_seconds, "observe")
 
     def test_prediction_count_defined(self):
-        """Test PREDICTION_COUNT is defined."""
-        if PREDICTION_COUNT is None:
-            pytest.skip("PREDICTION_COUNT not implemented yet")
-        assert hasattr(PREDICTION_COUNT, "inc")
-
-    def test_prediction_latency_defined(self):
-        """Test PREDICTION_LATENCY is defined."""
-        if PREDICTION_LATENCY is None:
-            pytest.skip("PREDICTION_LATENCY not implemented yet")
-        assert hasattr(PREDICTION_LATENCY, "observe")
-
-    def test_prediction_value_defined(self):
-        """Test PREDICTION_VALUE is defined."""
-        if PREDICTION_VALUE is None:
-            pytest.skip("PREDICTION_VALUE not implemented yet")
-        assert hasattr(PREDICTION_VALUE, "observe")
-
-    def test_model_loaded_defined(self):
-        """Test MODEL_LOADED is defined."""
-        if MODEL_LOADED is None:
-            pytest.skip("MODEL_LOADED not implemented yet")
-        assert hasattr(MODEL_LOADED, "set")
-
-    def test_model_info_defined(self):
-        """Test MODEL_INFO is defined."""
-        if MODEL_INFO is None:
-            pytest.skip("MODEL_INFO not implemented yet")
-        assert hasattr(MODEL_INFO, "info")
+        """Test ml_predictions_total is defined."""
+        assert ml_predictions_total is not None
+        assert hasattr(ml_predictions_total, "inc")
 
 
 class TestMetricHelpers:
@@ -85,15 +58,13 @@ class TestMetricLabels:
     """Test metric labels configuration."""
 
     def test_request_count_has_correct_labels(self):
-        """Test REQUEST_COUNT has method, endpoint, status labels."""
+        """Test http_requests_total has method, endpoint, status labels."""
         # Increment with labels to verify they work
-        REQUEST_COUNT.labels(method="GET", endpoint="/test", status=200).inc()
+        http_requests_total.labels(method="GET", endpoint="/test", status=200).inc()
 
     def test_request_latency_has_correct_labels(self):
-        """Test REQUEST_LATENCY has correct labels."""
-        if REQUEST_LATENCY is None:
-            pytest.skip("REQUEST_LATENCY not implemented yet")
-        REQUEST_LATENCY.labels(method="GET", endpoint="/test").observe(0.1)
+        """Test http_request_duration_seconds has correct labels."""
+        http_request_duration_seconds.labels(method="GET", endpoint="/test").observe(0.1)
 
 
 class TestMetricsEndpoint:

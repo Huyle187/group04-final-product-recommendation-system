@@ -63,7 +63,20 @@ services:
     networks:
       - recommendation-net
     restart: unless-stopped
-    # TODO: ====Add Prometheus configuration====
+
+  # ===========================================================================
+  # Alertmanager - Alert Routing
+  # ===========================================================================
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+    networks:
+      - recommendation-net
+    restart: unless-stopped
 
   # ===========================================================================
   # Grafana - Visualization and Dashboards
@@ -87,27 +100,26 @@ services:
     depends_on:
       - prometheus
     restart: unless-stopped
-    # TODO: ====Add Grafana provisioning====
 
   # ===========================================================================
-  # Node Exporter - System Metrics (Optional)
+  # Node Exporter - System Metrics
   # ===========================================================================
-  # node-exporter:
-  #   image: prom/node-exporter:v1.7.0
-  #   container_name: node-exporter
-  #   ports:
-  #     - "9100:9100"
-  #   volumes:
-  #     - /proc:/host/proc:ro
-  #     - /sys:/host/sys:ro
-  #     - /:/rootfs:ro
-  #   command:
-  #     - '--path.procfs=/host/proc'
-  #     - '--path.sysfs=/host/sys'
-  #     - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
-  #   networks:
-  #     - recommendation-net
-  #   restart: unless-stopped
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    container_name: node-exporter
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - recommendation-net
+    restart: unless-stopped
 
   # ===========================================================================
   # TODO: ====Add optional services====

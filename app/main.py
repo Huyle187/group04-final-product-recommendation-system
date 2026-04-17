@@ -347,15 +347,7 @@ async def reload_model() -> Dict[str, str]:
 # ============================================================================
 
 
-@app.get("/metrics", tags=["Metrics"])
-async def metrics():
-    """
-    Prometheus metrics endpoint
-
-    Returns all collected metrics for Prometheus to scrape
-    """
-    with RequestMetrics("GET", "/metrics"):
-        return generate_latest()
+# /metrics endpoint is handled by app.mount("/metrics", metrics_app) above
 
 
 # ============================================================================

@@ -16,11 +16,7 @@ from prometheus_client import Counter, Gauge, Histogram, Info
 # - endpoint: Request path (/predict, /health, etc.)
 # - status: HTTP status code (200, 404, 500, etc.)
 
-REQUEST_COUNT = Counter(
-    "http_requests_total",
-    "Total number of HTTP requests",
-    ["method", "endpoint", "status"],
-)
+# (Removed redundant REQUEST_COUNT)
 
 # TODO 2: Define HTTP request latency histogram
 # This histogram should track request duration in seconds with labels for:
@@ -28,12 +24,7 @@ REQUEST_COUNT = Counter(
 # - endpoint: Request path
 # Suggested buckets: [0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
 
-REQUEST_LATENCY = Histogram(
-    "http_request_duration_seconds",
-    "HTTP request latency in seconds",
-    ["method", "endpoint"],
-    buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0],
-)
+# (Removed redundant REQUEST_LATENCY)
 
 
 # =============================================================================
@@ -44,9 +35,7 @@ REQUEST_LATENCY = Histogram(
 # This counter should track total predictions with labels for:
 # - model_version: Version of the model used
 
-PREDICTION_COUNT = Counter(
-    "ml_predictions_total", "Total number of predictions made", ["model_version"]
-)
+# (Removed redundant PREDICTION_COUNT)
 
 
 # TODO 4: Define prediction latency histogram
@@ -54,12 +43,7 @@ PREDICTION_COUNT = Counter(
 # Suggested buckets for ML predictions (faster than HTTP):
 # [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5]
 
-PREDICTION_LATENCY = Histogram(
-    "ml_prediction_duration_seconds",
-    "Time to generate a prediction",
-    ["model_version"],
-    buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5],
-)
+# (Removed redundant PREDICTION_LATENCY)
 
 
 # TODO 5: Define prediction value histogram
@@ -190,10 +174,10 @@ BATCH_SIZE = Histogram(
 def get_all_metrics():
     """Return a dictionary of all defined metrics for inspection."""
     return {
-        "request_count": REQUEST_COUNT,
-        "request_latency": REQUEST_LATENCY,
-        "prediction_count": PREDICTION_COUNT,
-        "prediction_latency": PREDICTION_LATENCY,
+        "request_count": http_requests_total,
+        "request_latency": http_request_duration_seconds,
+        "prediction_count": ml_predictions_total,
+        "prediction_latency": ml_prediction_duration_seconds,
         "prediction_value": PREDICTION_VALUE,
         "prediction_errors": PREDICTION_ERRORS,
         "model_loaded": MODEL_LOADED,
