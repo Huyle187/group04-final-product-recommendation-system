@@ -41,6 +41,8 @@ class RecommendationModel:
         # Artifacts populated by load_model()
         self.user_factors: Optional[np.ndarray] = None  # (n_users, n_components)
         self.item_factors: Optional[np.ndarray] = None  # (n_items, n_components)
+        self.ease_B: Optional[np.ndarray] = None  # (n_active, n_active) EASE weights
+        self.ease_active_indices: Optional[np.ndarray] = None  # active item indices
         self.item_similarity_matrix: Optional[np.ndarray] = None  # (n_items, n_items)
         self.user_id_to_idx: Dict[str, int] = {}
         self.item_id_to_idx: Dict[str, int] = {}
@@ -89,6 +91,8 @@ class RecommendationModel:
 
             self.user_factors = bundle["user_factors"]
             self.item_factors = bundle["item_factors"]
+            self.ease_B = bundle.get("ease_B")  # None for old SVD-only bundles
+            self.ease_active_indices = bundle.get("ease_active_indices")
             self.item_similarity_matrix = bundle.get("item_similarity_matrix")
             self.user_id_to_idx = bundle["user_id_to_idx"]
             self.item_id_to_idx = bundle["item_id_to_idx"]
@@ -205,14 +209,25 @@ class RecommendationModel:
         self, user_id: str, n: int, filters: Optional[Dict]
     ) -> List[Dict[str, Any]]:
         """
-        Dot-product scoring using L2-normalized SVD user/item factors.
+        EASE scoring when ease_B is available; falls back to SVD dot-product.
         Cold-start users receive popularity-ranked fallback.
         """
         if user_id not in self.user_id_to_idx:
             return self._popular_items_fallback(n, filters)
 
         u_idx = self.user_id_to_idx[user_id]
-        scores = self.user_factors[u_idx] @ self.item_factors.T  # (n_items,)
+        n_items = len(self.item_id_to_idx)
+        if self.ease_B is not None and self.ease_active_indices is not None:
+            # EASE: project user history to active item subset, score, map back
+            user_row = np.array(
+                self.interaction_matrix[u_idx].todense(), dtype=np.float32
+            ).flatten()
+            active_user_row = user_row[self.ease_active_indices]
+            active_scores = active_user_row @ self.ease_B  # (n_active,)
+            scores = np.full(n_items, -np.inf, dtype=np.float32)
+            scores[self.ease_active_indices] = active_scores
+        else:
+            scores = self.user_factors[u_idx] @ self.item_factors.T  # (n_items,)
 
         # Mask already-seen items
         seen = self.interaction_matrix[u_idx].nonzero()[1]
@@ -433,7 +448,9 @@ class RecommendationModel:
                     "last_updated": self._model_metadata.get("created_at"),
                     "training_users": self._model_metadata.get("n_users"),
                     "training_items": self._model_metadata.get("n_items"),
+                    "algorithm": self._model_metadata.get("algorithm", "svd"),
                     "svd_components": self._model_metadata.get("svd_n_components"),
+                    "ease_lambda": self._model_metadata.get("ease_lambda"),
                     "evaluation_metrics": self._model_metadata.get("metrics", {}),
                 }
             )

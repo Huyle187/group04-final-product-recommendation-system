@@ -270,6 +270,360 @@ class FairnessChecker:
         }
 
     # =========================================================================
+    # User-Segment Fairness
+    # =========================================================================
+
+    def check_user_segment_fairness(
+        self,
+        user_ids: List[str],
+        recs_per_user: Dict[str, List[str]],
+    ) -> Dict[str, Any]:
+        """
+        Measure whether recommendation quality is equitable across user activity
+        segments (power / mid / casual), using interaction count as a proxy for
+        engagement level.
+
+        Segments:
+          - power:  top 20% by training interaction count
+          - casual: bottom 20%
+          - mid:    remaining 60%
+
+        For each segment, reports:
+          avg_score (mean recommendation score), avg_diversity (category entropy),
+          popular_fraction (popularity bias), n_users.
+
+        Flags unfairness when the metric gap between 'power' and 'casual' exceeds
+        FAIRNESS_SEGMENT_GAP_THRESHOLD (default 0.2).
+
+        Args:
+            user_ids: Users to evaluate
+            recs_per_user: {user_id: [product_id, ...]} — pre-generated recommendations
+
+        Returns:
+            Dict with per-segment metrics and fairness_gap flags
+        """
+        if not self.model.interaction_matrix is not None or not user_ids:
+            return {"error": "Interaction matrix not available or no users provided"}
+
+        # Compute per-user interaction counts from the training matrix
+        user_counts: Dict[str, int] = {}
+        for uid in user_ids:
+            idx = self.model.user_id_to_idx.get(uid)
+            if idx is not None:
+                user_counts[uid] = int(self.model.interaction_matrix[idx].nnz)
+
+        if not user_counts:
+            return {"error": "None of the provided users found in training data"}
+
+        counts_arr = np.array(list(user_counts.values()))
+        p20 = float(np.percentile(counts_arr, 20))
+        p80 = float(np.percentile(counts_arr, 80))
+
+        segments: Dict[str, List[str]] = {"power": [], "mid": [], "casual": []}
+        for uid, cnt in user_counts.items():
+            if cnt >= p80:
+                segments["power"].append(uid)
+            elif cnt <= p20:
+                segments["casual"].append(uid)
+            else:
+                segments["mid"].append(uid)
+
+        segment_metrics: Dict[str, Any] = {}
+        for seg_name, seg_users in segments.items():
+            if not seg_users:
+                segment_metrics[seg_name] = {"n_users": 0}
+                continue
+
+            pop_fractions, div_scores = [], []
+            for uid in seg_users:
+                rec_ids = recs_per_user.get(uid, [])
+                if not rec_ids:
+                    continue
+                pop_result = self.check_popularity_bias(rec_ids)
+                div_result = self.check_category_diversity(rec_ids)
+                pop_fractions.append(pop_result.get("popular_items_fraction", 0.0))
+                div_scores.append(div_result.get("category_diversity_score", 0.0))
+
+            segment_metrics[seg_name] = {
+                "n_users": len(seg_users),
+                "avg_popular_fraction": round(
+                    float(np.mean(pop_fractions)) if pop_fractions else 0.0, 4
+                ),
+                "avg_diversity_score": round(
+                    float(np.mean(div_scores)) if div_scores else 0.0, 4
+                ),
+            }
+
+        # Fairness gap: difference between power and casual segments
+        power_div = segment_metrics.get("power", {}).get("avg_diversity_score", 0.0)
+        casual_div = segment_metrics.get("casual", {}).get("avg_diversity_score", 0.0)
+        diversity_gap = round(abs(power_div - casual_div), 4)
+
+        power_pop = segment_metrics.get("power", {}).get("avg_popular_fraction", 0.0)
+        casual_pop = segment_metrics.get("casual", {}).get("avg_popular_fraction", 0.0)
+        popularity_gap = round(abs(power_pop - casual_pop), 4)
+
+        threshold = settings.FAIRNESS_SEGMENT_GAP_THRESHOLD
+        unfair = diversity_gap > threshold or popularity_gap > threshold
+
+        return {
+            "segments": segment_metrics,
+            "diversity_gap_power_vs_casual": diversity_gap,
+            "popularity_gap_power_vs_casual": popularity_gap,
+            "segment_fairness_threshold": threshold,
+            "unfairness_detected": unfair,
+            "interpretation": (
+                "Significant disparity between power and casual users detected."
+                if unfair
+                else "Recommendation quality is relatively equitable across user segments."
+            ),
+        }
+
+    # =========================================================================
+    # Long-Tail Item Exposure
+    # =========================================================================
+
+    def check_long_tail_exposure(
+        self,
+        all_recommendation_lists: List[List[str]],
+    ) -> Dict[str, Any]:
+        """
+        Measure exposure across item popularity tiers: head / torso / tail.
+
+        Tiers (by item popularity percentile):
+          - head:  top 20%  (P80 and above)
+          - torso: middle 60% (P20–P80)
+          - tail:  bottom 20% (below P20)
+
+        For each tier, exposure = (items in tier that appear in any rec list)
+                                  / (total items in that tier in the catalog).
+
+        Flags tail suppression if tail_exposure < FAIRNESS_LONG_TAIL_THRESHOLD (0.2).
+
+        Args:
+            all_recommendation_lists: One list of product_ids per user
+
+        Returns:
+            Dict with per-tier exposure ratios and tail_suppression_detected flag
+        """
+        if not self._popularity_thresholds:
+            return {"error": "Popularity data not available"}
+
+        p20 = float(np.percentile(list(self.model.item_popularity.values()), 20))
+        p80 = self._popularity_thresholds.get("p80", 0.0)
+
+        tiers: Dict[str, set] = {"head": set(), "torso": set(), "tail": set()}
+        for iid, cnt in self.model.item_popularity.items():
+            if iid not in self.model.item_id_to_idx:
+                continue
+            if cnt >= p80:
+                tiers["head"].add(iid)
+            elif cnt <= p20:
+                tiers["tail"].add(iid)
+            else:
+                tiers["torso"].add(iid)
+
+        # Flatten all recommended items
+        all_recommended: set = set()
+        for rec_list in all_recommendation_lists:
+            all_recommended.update(rec_list)
+
+        tier_exposure: Dict[str, float] = {}
+        tier_counts: Dict[str, int] = {}
+        for tier_name, tier_items in tiers.items():
+            exposed = len(all_recommended & tier_items)
+            total = len(tier_items)
+            tier_exposure[f"{tier_name}_exposure"] = round(
+                exposed / total if total else 0.0, 4
+            )
+            tier_counts[f"{tier_name}_total_items"] = total
+
+        tail_exp = tier_exposure.get("tail_exposure", 0.0)
+        tail_suppressed = tail_exp < settings.FAIRNESS_LONG_TAIL_THRESHOLD
+
+        return {
+            **tier_exposure,
+            **tier_counts,
+            "tail_suppression_detected": tail_suppressed,
+            "long_tail_threshold": settings.FAIRNESS_LONG_TAIL_THRESHOLD,
+            "interpretation": (
+                f"Long-tail items are underexposed ({tail_exp:.1%} coverage). "
+                "Consider diversity re-ranking or popularity penalty."
+                if tail_suppressed
+                else f"Acceptable long-tail exposure ({tail_exp:.1%})."
+            ),
+        }
+
+    # =========================================================================
+    # Bias Mitigation Strategies
+    # =========================================================================
+
+    def apply_mitigation(
+        self,
+        recommendations: List[Dict[str, Any]],
+        strategy: str = "diversity_rerank",
+        user_history: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Apply a post-hoc bias mitigation strategy to a recommendation list.
+
+        Strategies:
+          - diversity_rerank: Maximal Marginal Relevance (MMR) re-ranking.
+            Balances relevance (original score) with dissimilarity to already-
+            selected items.  λ = MMR_LAMBDA (default 0.7).
+          - popularity_penalty: Penalise each item's score by its relative
+            popularity, boosting long-tail items.
+          - calibrated: Reorder so the category distribution matches the
+            distribution observed in user_history (requires user_history).
+
+        Args:
+            recommendations: List of dicts with 'product_id' and 'score' keys
+            strategy: One of 'diversity_rerank', 'popularity_penalty', 'calibrated'
+            user_history: Required for 'calibrated' strategy
+
+        Returns:
+            Reordered / rescored recommendation list (same length as input)
+        """
+        if not recommendations:
+            return recommendations
+
+        if strategy == "popularity_penalty":
+            return self._popularity_penalty(recommendations)
+        elif strategy == "calibrated":
+            return self._calibrated_rerank(recommendations, user_history or [])
+        else:  # default: diversity_rerank (MMR)
+            return self._mmr_rerank(recommendations)
+
+    def _mmr_rerank(
+        self, recommendations: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Maximal Marginal Relevance reranking.
+        MMR(i) = λ * score(i) - (1-λ) * max_sim(i, already_selected)
+        """
+        lam = settings.MMR_LAMBDA
+        n = len(recommendations)
+        if n <= 1:
+            return recommendations
+
+        item_ids = [r["product_id"] for r in recommendations]
+        scores = np.array([r["score"] for r in recommendations], dtype=float)
+
+        # Build item factor matrix for similarity computation
+        indices = [self.model.item_id_to_idx.get(iid) for iid in item_ids]
+        has_factors = all(
+            i is not None and self.model.item_factors is not None for i in indices
+        )
+
+        if not has_factors:
+            return recommendations  # fallback: return unchanged
+
+        vecs = np.array(
+            [self.model.item_factors[i] for i in indices]  # type: ignore[index]
+        )  # (n, n_components) — already L2-normalized
+
+        selected: List[int] = []
+        remaining = list(range(n))
+        result: List[Dict[str, Any]] = []
+
+        # Always select the highest-scoring item first
+        first = int(np.argmax(scores))
+        selected.append(first)
+        remaining.remove(first)
+        result.append(recommendations[first])
+
+        while remaining:
+            selected_vecs = vecs[selected]  # (k, n_components)
+            mmr_scores = []
+            for i in remaining:
+                sim_to_selected = float(np.max(vecs[i] @ selected_vecs.T))
+                mmr = lam * scores[i] - (1.0 - lam) * sim_to_selected
+                mmr_scores.append(mmr)
+
+            best_pos = int(np.argmax(mmr_scores))
+            best_idx = remaining[best_pos]
+            selected.append(best_idx)
+            remaining.remove(best_idx)
+            result.append(recommendations[best_idx])
+
+        return result
+
+    def _popularity_penalty(
+        self, recommendations: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Penalise score by relative popularity (log-normalized)."""
+        if not self.model.item_popularity:
+            return recommendations
+
+        max_pop = max(self.model.item_popularity.values()) or 1
+        result = []
+        for rec in recommendations:
+            pop = self.model.item_popularity.get(rec["product_id"], 1)
+            penalty = float(np.log1p(pop) / np.log1p(max_pop))
+            new_rec = dict(rec)
+            new_rec["score"] = round(
+                float(np.clip(rec["score"] * (1.0 - 0.5 * penalty), 0.0, 1.0)), 6
+            )
+            result.append(new_rec)
+        result.sort(key=lambda x: x["score"], reverse=True)
+        return result
+
+    def _calibrated_rerank(
+        self,
+        recommendations: List[Dict[str, Any]],
+        user_history: List[str],
+    ) -> List[Dict[str, Any]]:
+        """
+        Reorder recommendations so their category distribution matches the
+        user's historical category distribution.
+        Uses greedy calibration: at each step pick the item that minimises
+        KL divergence between target and current distribution.
+        """
+        from collections import Counter
+
+        if not user_history:
+            return recommendations
+
+        hist_cats = [
+            self.model.item_categories.get(iid, "unknown") for iid in user_history
+        ]
+        hist_total = len(hist_cats)
+        target_dist: Dict[str, float] = {
+            cat: cnt / hist_total for cat, cnt in Counter(hist_cats).items()
+        }
+
+        selected: List[Dict[str, Any]] = []
+        remaining = list(recommendations)
+        cat_counts: Counter = Counter()
+
+        while remaining:
+            best_item = None
+            best_kl = float("inf")
+
+            for rec in remaining:
+                cat = self.model.item_categories.get(rec["product_id"], "unknown")
+                trial_counts = Counter(cat_counts)
+                trial_counts[cat] += 1
+                trial_total = sum(trial_counts.values())
+                trial_dist = {c: trial_counts[c] / trial_total for c in target_dist}
+                kl = sum(
+                    p * np.log((p + 1e-12) / (trial_dist.get(c, 1e-12) + 1e-12))
+                    for c, p in target_dist.items()
+                )
+                if kl < best_kl:
+                    best_kl = kl
+                    best_item = rec
+
+            if best_item is None:
+                break
+            selected.append(best_item)
+            remaining.remove(best_item)
+            cat = self.model.item_categories.get(best_item["product_id"], "unknown")
+            cat_counts[cat] += 1
+
+        return selected
+
+    # =========================================================================
     # Statistical Utilities
     # =========================================================================
 

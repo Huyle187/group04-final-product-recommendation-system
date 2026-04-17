@@ -1,0 +1,51 @@
+{
+  "metadata": {
+    "bundle_path": "models/model_bundle.pkl",
+    "evaluated_at": "2026-04-17T01:41:08.825147",
+    "k": 10,
+    "model_type": "hybrid",
+    "algorithm": "ease",
+    "model_version": "1.0.0",
+    "training_users": 39635,
+    "training_items": 92146,
+    "svd_components": 50,
+    "ease_lambda": 500.0
+  },
+  "ranking_metrics": {
+    "precision@10": 0.017719,
+    "recall@10": 0.078498,
+    "ndcg@10": 0.052843,
+    "mrr@10": 0.064659,
+    "hit_rate@10": 0.152845,
+    "f1@10": 0.028912,
+    "n_eval_users": 39635
+  },
+  "diversity_metrics": {
+    "intra_list_diversity": 0.8267,
+    "category_entropy@10": 0.86,
+    "novelty@10": 14.4157,
+    "n_sampled_users": 1000
+  },
+  "coverage_metrics": {
+    "catalog_coverage": 0.0732,
+    "user_coverage": 1.0,
+    "long_tail_coverage": 0.0031,
+    "unique_items_recommended": 6749,
+    "total_catalog_items": 92146,
+    "tail_items_in_catalog": 55923
+  },
+  "summary": {
+    "precision@10": 0.017719,
+    "recall@10": 0.078498,
+    "ndcg@10": 0.052843,
+    "mrr@10": 0.064659,
+    "hit_rate@10": 0.152845,
+    "f1@10": 0.028912,
+    "intra_list_diversity": 0.8267,
+    "category_entropy@10": 0.86,
+    "novelty@10": 14.4157,
+    "catalog_coverage": 0.0732,
+    "user_coverage": 1.0,
+    "long_tail_coverage": 0.0031
+  }
+}

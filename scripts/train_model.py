@@ -21,11 +21,11 @@ from typing import Any, Dict, List, Optional, Tuple
 import joblib
 import numpy as np
 import pandas as pd
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, eye
+from scipy.sparse.linalg import spsolve
 from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.model_selection import GroupShuffleSplit
 from sklearn.preprocessing import normalize
 
 # Allow importing app config when run from project root
@@ -60,6 +60,10 @@ class ModelTrainer:
         # Model artifacts (populated by train_* methods)
         self.user_factors: Optional[np.ndarray] = None  # (n_users, n_components)
         self.item_factors: Optional[np.ndarray] = None  # (n_items, n_components)
+        self.ease_B: Optional[np.ndarray] = (
+            None  # (n_active, n_active) EASE weight matrix
+        )
+        self.ease_active_indices: Optional[np.ndarray] = None  # indices into item space
         self.item_similarity_matrix: Optional[np.ndarray] = (
             None  # (n_items, n_items) float32
         )
@@ -302,6 +306,95 @@ class ModelTrainer:
             "explained_variance_ratio": evr,
         }
 
+    def train_ease_model(
+        self, train_matrix: csr_matrix, l2_lambda: float = 500.0
+    ) -> Dict:
+        """
+        Train EASE (Embarrassingly Shallow Autoencoder) item-item model.
+
+        Closed-form solution:
+            G = X^T X  (item-item Gram matrix, restricted to active items)
+            B = I - P * diag(1 / diag(P)),  where P = (G + λI)^{-1}
+            diag(B) = 0  (no self-loops)
+
+        Score for user u:  scores = X[u, active] @ B
+
+        Memory constraint: a dense n_items × n_items float32 matrix requires
+        n_items^2 * 4 bytes.  We restrict EASE to items that appear in the
+        training data (active items) and further cap at MAX_EASE_ITEMS to keep
+        the Gram matrix ≤ ~1 GB.
+
+        Reference: Steck, H. (2019). Embarrassingly Shallow Autoencoders
+        for Sparse Data. WWW 2019.
+
+        Args:
+            train_matrix: csr_matrix (n_users x n_items) interaction matrix
+            l2_lambda: L2 regularization strength (default 500 works well for
+                       Retail Rocket sparsity level)
+
+        Returns:
+            Dict with ease_B weight matrix, active_item_indices, and lambda used
+        """
+        MAX_EASE_ITEMS = 16000  # 16k × 16k × 4 bytes ≈ 1 GB
+
+        # Find items that actually appear in training data
+        item_interaction_counts = np.asarray(train_matrix.sum(axis=0)).flatten()
+        active_mask = item_interaction_counts > 0
+        active_indices = np.where(active_mask)[0]
+
+        if len(active_indices) > MAX_EASE_ITEMS:
+            # Keep the top-MAX_EASE_ITEMS most-interacted items
+            top_by_count = np.argsort(item_interaction_counts)[::-1][:MAX_EASE_ITEMS]
+            active_indices = np.sort(top_by_count)
+            logger.info(
+                f"EASE item cap: restricting to top {MAX_EASE_ITEMS:,} items "
+                f"(from {active_mask.sum():,} active items)"
+            )
+
+        n_active = len(active_indices)
+        logger.info(
+            f"Training EASE: n_active_items={n_active:,}, λ={l2_lambda}, "
+            f"matrix shape={train_matrix.shape}"
+        )
+
+        # Submatrix: only active item columns
+        X_active = train_matrix[:, active_indices]  # (n_users, n_active) sparse
+
+        # Gram matrix G = X^T X  (dense, n_active × n_active)
+        G = (X_active.T @ X_active).toarray().astype(np.float32)
+
+        # Add L2 regularization: P = (G + λI)^{-1}
+        diag_indices = np.arange(n_active)
+        G[diag_indices, diag_indices] += l2_lambda
+
+        logger.info(f"Inverting {n_active:,} × {n_active:,} Gram matrix …")
+        P = np.linalg.inv(G)
+
+        # EASE closed form: B_ij = -P_ij / P_jj,  B_jj = 0
+        B = (-P / np.diag(P)).astype(np.float32)
+        B[diag_indices, diag_indices] = 0.0
+
+        # Store the active indices so inference can map back to full item space
+        self.ease_B = B
+        self.ease_active_indices = active_indices  # (n_active,)
+
+        # SVD on the full matrix for explainability (SHAP/LIME need latent vectors)
+        n_components = min(settings.SVD_N_COMPONENTS, min(train_matrix.shape) - 1)
+        svd = TruncatedSVD(
+            n_components=n_components, n_iter=settings.SVD_N_ITER, random_state=42
+        )
+        user_factors = svd.fit_transform(train_matrix)
+        item_factors = svd.components_.T
+        self.user_factors = normalize(user_factors, norm="l2")
+        self.item_factors = normalize(item_factors, norm="l2")
+
+        logger.info(f"EASE training complete ({n_active:,} active items)")
+        return {
+            "ease_B": B,
+            "ease_active_indices": active_indices,
+            "l2_lambda": l2_lambda,
+        }
+
     def train_content_based_model(self, features: Dict) -> Dict:
         """
         Build item-item cosine similarity matrix from TF-IDF features.
@@ -356,6 +449,51 @@ class ModelTrainer:
         }
 
     # =========================================================================
+    # Train/Test Split
+    # =========================================================================
+
+    def temporal_user_split(
+        self, interactions: pd.DataFrame, test_fraction: float = 0.2
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Per-user temporal split: each user's last `test_fraction` of interactions
+        (sorted by timestamp) go into the test set; the rest into train.
+
+        This is the correct protocol for implicit feedback because:
+        - Users appear in BOTH train and test → the model can personalize for them
+        - Temporal ordering respects the real prediction scenario (predict future from past)
+        - GroupShuffleSplit (old) created non-overlapping user sets → all metrics = ~0
+
+        Args:
+            interactions: DataFrame with columns [visitorid, itemid, weight, timestamp]
+            test_fraction: Fraction of each user's history to hold out (default 0.2)
+
+        Returns:
+            (train_df, test_df)
+        """
+        interactions = interactions.sort_values(["visitorid", "timestamp"])
+        train_rows: List[pd.DataFrame] = []
+        test_rows: List[pd.DataFrame] = []
+
+        for _uid, grp in interactions.groupby("visitorid", sort=False):
+            n = len(grp)
+            if n < 2:
+                # Single-interaction users go fully to train; can't evaluate
+                train_rows.append(grp)
+            else:
+                split = max(1, int(n * (1 - test_fraction)))
+                train_rows.append(grp.iloc[:split])
+                test_rows.append(grp.iloc[split:])
+
+        train_df = pd.concat(train_rows, ignore_index=True)
+        test_df = (
+            pd.concat(test_rows, ignore_index=True)
+            if test_rows
+            else pd.DataFrame(columns=interactions.columns)
+        )
+        return train_df, test_df
+
+    # =========================================================================
     # Evaluation
     # =========================================================================
 
@@ -394,7 +532,18 @@ class ModelTrainer:
                 continue  # cold-start user — skip evaluation
 
             u_idx = self.user_id_to_idx[user_id]
-            scores = self.user_factors[u_idx] @ self.item_factors.T  # (n_items,)
+            n_items = self.interaction_matrix.shape[1]
+            if self.ease_B is not None and self.ease_active_indices is not None:
+                # EASE: restrict to active item columns, score, map back
+                user_row = np.array(
+                    self.interaction_matrix[u_idx].todense(), dtype=np.float32
+                ).flatten()
+                active_user_row = user_row[self.ease_active_indices]
+                active_scores = active_user_row @ self.ease_B  # (n_active,)
+                scores = np.full(n_items, -np.inf, dtype=np.float32)
+                scores[self.ease_active_indices] = active_scores
+            else:
+                scores = self.user_factors[u_idx] @ self.item_factors.T  # (n_items,)
 
             # Mask training items
             seen = self.interaction_matrix[u_idx].nonzero()[1]
@@ -448,6 +597,8 @@ class ModelTrainer:
         model_bundle = {
             "user_factors": self.user_factors,
             "item_factors": self.item_factors,
+            "ease_B": self.ease_B,
+            "ease_active_indices": getattr(self, "ease_active_indices", None),
             "item_similarity_matrix": self.item_similarity_matrix,
             "user_id_to_idx": self.user_id_to_idx,
             "item_id_to_idx": self.item_id_to_idx,
@@ -458,12 +609,14 @@ class ModelTrainer:
             "interaction_matrix": self.interaction_matrix,
             "metadata": {
                 "model_type": self.model_type,
+                "algorithm": "ease" if self.ease_B is not None else "svd",
                 "version": self.metadata["version"],
                 "created_at": self.metadata["created_at"],
                 "metrics": self.metrics,
                 "n_users": len(self.user_id_to_idx),
                 "n_items": len(self.item_id_to_idx),
                 "svd_n_components": settings.SVD_N_COMPONENTS,
+                "ease_lambda": settings.EASE_LAMBDA,
                 "hybrid_collab_weight": settings.HYBRID_COLLAB_WEIGHT,
                 "hybrid_content_weight": settings.HYBRID_CONTENT_WEIGHT,
             },
@@ -603,17 +756,27 @@ def main():
     # Step 1: Load data
     interactions, stats = trainer.load_data(args.dataset)
 
-    # Step 2: Train/test split (20% per-user held out)
+    # Step 2: Per-user temporal train/test split (last 20% of each user's history)
+    # Load events with timestamps for temporal ordering
+    events_raw = pd.read_csv(Path(args.dataset) / "events.csv")
+    events_raw = events_raw.dropna(subset=["itemid"])
+    events_raw["itemid"] = events_raw["itemid"].astype(int).astype(str)
+    events_raw["visitorid"] = events_raw["visitorid"].astype(str)
+    # Merge timestamp back into interactions for temporal split
+    ts_map = (
+        events_raw.sort_values("timestamp")
+        .groupby(["visitorid", "itemid"])["timestamp"]
+        .last()
+    )
+    interactions = interactions.join(ts_map, on=["visitorid", "itemid"])
+
     train_interactions = interactions
     test_interactions = None
 
     if args.evaluate:
-        gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
-        train_idx, test_idx = next(
-            gss.split(interactions, groups=interactions["visitorid"])
+        train_interactions, test_interactions = trainer.temporal_user_split(
+            interactions, test_fraction=0.2
         )
-        train_interactions = interactions.iloc[train_idx].reset_index(drop=True)
-        test_interactions = interactions.iloc[test_idx].reset_index(drop=True)
 
         # Rebuild interaction matrix from TRAIN interactions only
         rows = train_interactions["visitorid"].map(trainer.user_id_to_idx).values
@@ -625,8 +788,9 @@ def main():
             dtype=np.float32,
         )
         logger.info(
-            f"Train/test split: {len(train_interactions):,} train, "
-            f"{len(test_interactions):,} test interactions"
+            f"Temporal train/test split: {len(train_interactions):,} train, "
+            f"{len(test_interactions):,} test interactions, "
+            f"{test_interactions['visitorid'].nunique():,} test users"
         )
 
     # Step 3: Feature engineering
@@ -637,8 +801,8 @@ def main():
     content_result = None
 
     if args.model in ("collaborative", "hybrid"):
-        collab_result = trainer.train_collaborative_filtering(
-            trainer.interaction_matrix
+        collab_result = trainer.train_ease_model(
+            trainer.interaction_matrix, l2_lambda=settings.EASE_LAMBDA
         )
 
     if args.model in ("content_based", "hybrid"):
