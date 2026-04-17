@@ -10,6 +10,8 @@ from prometheus_client import REGISTRY
 from app.metrics import (
     PredictionMetrics,
     RequestMetrics,
+    count_implemented_metrics,
+    get_all_metrics,
     http_request_duration_seconds,
     http_requests_total,
     ml_predictions_total,
