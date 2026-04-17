@@ -358,21 +358,26 @@ async def explain_recommendation(
     product_id: str = Query(..., description="Product ID to explain"),
     method: str = Query(
         "auto",
-        description="Explanation method: auto, collaborative, or content_based",
+        description=(
+            "Explanation method: auto | collaborative | content_based | shap | lime | all. "
+            "shap: exact latent-factor SHAP decomposition (O(n_components), < 1ms). "
+            "lime: local Ridge approximation with 50 perturbations (< 5ms). "
+            "all: returns all four methods combined."
+        ),
     ),
 ) -> Dict[str, Any]:
     """
     Explain why a specific product was recommended to a user.
 
     Methods:
-    - auto: Uses collaborative if model is loaded, otherwise content_based
-    - collaborative: Neighbor-based — shows similar users who also interacted with this item
-    - content_based: Feature similarity — shows which viewed items are similar to this product
-
-    Note: Standard SHAP/KernelSHAP is not used here because it requires hundreds of
-    model evaluations per request, making it impractical for real-time serving with
-    TruncatedSVD matrix factorization. The neighbor-based approach provides equivalent
-    conceptual explanations with O(1) latency using the pre-computed latent space.
+    - **auto**: SHAP when model is loaded, otherwise collaborative neighbor-based
+    - **collaborative**: Nearest-neighbor — shows similar users who interacted with this item
+    - **content_based**: Feature similarity — shows most similar items from user history
+    - **shap**: Exact latent-factor SHAP. score = Σ SHAP_j where SHAP_j = u_j * i_j.
+      Returns top-k dimensions and representative catalog items per dimension.
+    - **lime**: Local linear approximation. Perturbs item latent vector, fits Ridge
+      regression, returns coefficient importances per latent dimension.
+    - **all**: Returns results from all four methods in a single response.
     """
     with RequestMetrics("GET", "/recommendations/{user_id}/explain"):
         try:
@@ -432,6 +437,72 @@ async def check_fairness(
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to compute fairness metrics",
+            )
+
+
+@app.get("/fairness/report", tags=["Responsible AI"])
+async def fairness_report(
+    sample_users: int = Query(
+        100,
+        ge=1,
+        le=500,
+        description="Number of users to sample for system-wide analysis",
+    ),
+) -> Dict[str, Any]:
+    """
+    System-wide bias analysis across a sample of users.
+
+    Runs three fairness checks:
+    - **Catalog coverage**: fraction of catalog items reachable via recommendations
+    - **Long-tail exposure**: exposure ratio across head / torso / tail popularity tiers
+    - **User-segment fairness**: metric parity between power, mid, and casual users
+
+    Returns a comprehensive report with per-segment breakdown, long-tail
+    suppression flags, and overall fairness interpretation.
+    """
+    with RequestMetrics("GET", "/fairness/report"):
+        try:
+            model = get_model()
+            checker = get_fairness_checker()
+
+            if not model.model.get("initialized"):
+                return {
+                    "status": "model_not_loaded",
+                    "message": "Fairness report requires a trained model bundle.",
+                }
+
+            # Sample users from training data
+            all_users = list(model.user_id_to_idx.keys())
+            import random
+
+            sampled = random.sample(all_users, min(sample_users, len(all_users)))
+
+            # Generate recommendations for each sampled user
+            recs_per_user: Dict[str, Any] = {}
+            all_rec_lists = []
+            for uid in sampled:
+                recs = model.get_recommendations(uid, num_recommendations=10)
+                rec_ids = [r["product_id"] for r in recs]
+                recs_per_user[uid] = rec_ids
+                all_rec_lists.append(rec_ids)
+
+            # Run all bias checks
+            catalog_cov = checker.check_catalog_coverage(all_rec_lists)
+            long_tail = checker.check_long_tail_exposure(all_rec_lists)
+            segment = checker.check_user_segment_fairness(sampled, recs_per_user)
+
+            return {
+                "status": "ok",
+                "n_users_sampled": len(sampled),
+                "catalog_coverage": catalog_cov,
+                "long_tail_exposure": long_tail,
+                "user_segment_fairness": segment,
+            }
+        except Exception as e:
+            logger.error(f"Fairness report error: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to generate fairness report",
             )
 
 

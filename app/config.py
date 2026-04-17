@@ -60,5 +60,17 @@ class Settings:
     SVD_N_COMPONENTS: int = int(os.getenv("SVD_N_COMPONENTS", "50"))
     SVD_N_ITER: int = int(os.getenv("SVD_N_ITER", "10"))
 
+    # EASE Item-Item Model
+    EASE_LAMBDA: float = float(os.getenv("EASE_LAMBDA", "500.0"))
+
+    # Bias Mitigation Settings
+    MMR_LAMBDA: float = float(os.getenv("MMR_LAMBDA", "0.7"))
+    FAIRNESS_LONG_TAIL_THRESHOLD: float = float(
+        os.getenv("FAIRNESS_LONG_TAIL_THRESHOLD", "0.2")
+    )
+    FAIRNESS_SEGMENT_GAP_THRESHOLD: float = float(
+        os.getenv("FAIRNESS_SEGMENT_GAP_THRESHOLD", "0.2")
+    )
+
 
 settings = Settings()

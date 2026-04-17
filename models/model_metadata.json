@@ -1,11 +1,19 @@
 {
   "model_type": "hybrid",
+  "algorithm": "ease",
   "version": "1.0.0",
-  "created_at": "2026-04-16T17:16:33.218576",
-  "metrics": {},
+  "created_at": "2026-04-17T01:29:31.511813",
+  "metrics": {
+    "precision@10": 0.018216223035196166,
+    "recall@10": 0.09546609906135842,
+    "ndcg@10": 0.061110406915270345,
+    "catalog_coverage": 0.1514227421700345,
+    "n_eval_users": 39635.0
+  },
   "n_users": 39635,
   "n_items": 92146,
   "svd_n_components": 50,
+  "ease_lambda": 500.0,
   "hybrid_collab_weight": 0.6,
   "hybrid_content_weight": 0.4
 }
