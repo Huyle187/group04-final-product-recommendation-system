@@ -1,14 +1,8 @@
 {
-  "model_type": "collaborative",
+  "model_type": "hybrid",
   "version": "1.0.0",
-  "created_at": "2026-04-16T14:33:55.258567",
-  "metrics": {
-    "precision@10": 6.307556452630251e-05,
-    "recall@10": 3.26333843647965e-05,
-    "ndcg@10": 5.927953162247806e-05,
-    "catalog_coverage": 0.00010852343020858203,
-    "n_eval_users": 7927.0
-  },
+  "created_at": "2026-04-16T17:16:33.218576",
+  "metrics": {},
   "n_users": 39635,
   "n_items": 92146,
   "svd_n_components": 50,

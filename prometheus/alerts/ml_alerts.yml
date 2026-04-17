@@ -5,7 +5,82 @@ groups:
   - name: ml_alerts
     interval: 30s
     rules:
-      # TODO: ====High prediction error rate alert====
+
+      # Model Not Loaded Alert
+      # Trigger when the ML model is not loaded
+      # Severity: critical
+      
+      - alert: ModelNotLoaded
+        expr: ml_model_loaded == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ML Model not loaded"
+          description: "The ML model is not loaded on the API server"
+
+      # Prediction Latency High Alert
+      # Trigger when P95 prediction latency exceeds 100ms
+      # Severity: warning
+      
+      - alert: PredictionLatencyHigh
+        expr: |
+          histogram_quantile(0.95, 
+            rate(ml_prediction_duration_seconds_bucket[5m])
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ML prediction latency is high"
+          description: "P95 prediction latency is {{ $value }}s (threshold: 0.1s)"
+
+      # Low Prediction Volume Alert
+      # Trigger when prediction rate drops significantly
+      # Could indicate service issues or traffic problems
+      # Severity: warning
+      
+      - alert: LowPredictionVolume
+        expr: rate(ml_predictions_total[5m]) < 0.1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low prediction volume"
+          description: "Prediction rate is {{ $value }}/s, unusually low"
+
+      # Prediction Distribution Anomaly Alert
+      # Trigger when median prediction shifts significantly from historical
+      # This is a simple drift detection mechanism
+      # Severity: warning
+      
+      - alert: PredictionDistributionAnomaly
+        expr: |
+          abs(
+            histogram_quantile(0.5, rate(ml_prediction_value_bucket[1h])) -
+            histogram_quantile(0.5, rate(ml_prediction_value_bucket[1h] offset 24h))
+          ) > 0.5
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prediction distribution shift detected"
+          description: "Median prediction has shifted by more than 0.5 in 24h"
+
+      # Model Stale Alert
+      # Trigger when model hasn't been reloaded in a long time (e.g., 7 days)
+      # Severity: info
+      
+      - alert: ModelStale
+        expr: time() - ml_model_last_reload_timestamp > 604800
+        for: 1h
+        labels:
+          severity: info
+        annotations:
+          summary: "ML model may be stale"
+          description: "Model hasn't been reloaded in {{ $value | humanizeDuration }}"
+
+      # High prediction error rate alert
       # Alert when prediction failures exceed threshold
       - alert: HighPredictionErrorRate
         expr: |
@@ -17,7 +92,7 @@ groups:
           summary: "High ML prediction error rate"
           description: "Error rate is {{ $value | humanizePercentage }}"
 
-      # TODO: ====Model latency alert====
+      # Model latency alert
       # Alert when model inference is slow
       - alert: SlowModelInference
         expr: |
@@ -29,7 +104,7 @@ groups:
           summary: "Model inference is slow"
           description: "P95 prediction latency is {{ $value }}s"
 
-      # TODO: ====Low cache hit rate alert====
+      # Low cache hit rate alert
       # Alert when recommendation cache effectiveness is low
       - alert: LowCacheHitRate
         expr: |

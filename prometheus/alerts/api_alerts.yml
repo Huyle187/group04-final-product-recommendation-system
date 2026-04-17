@@ -5,31 +5,31 @@ groups:
   - name: api_alerts
     interval: 30s
     rules:
-      # TODO: ====High error rate alert====
       # Alert when error rate exceeds threshold for 5 minutes
       - alert: HighErrorRate
         expr: |
-          (rate(errors_total[5m]) / rate(http_requests_total[5m])) > 0.05
-        for: 5m
+          rate(http_requests_total{status=~"5.."}[5m]) 
+          / rate(http_requests_total[5m]) > 0.1
+        for: 2m
         labels:
           severity: critical
         annotations:
-          summary: "High error rate on API"
-          description: "Error rate is {{ $value | humanizePercentage }}"
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 10%)"
 
-      # TODO: ====High latency alert====
       # Alert when P95 latency exceeds threshold
       - alert: HighLatency
         expr: |
-          histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
+          histogram_quantile(0.95, 
+            rate(http_request_duration_seconds_bucket[5m])
+          ) > 1
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "High API latency detected"
-          description: "P95 latency is {{ $value }}s"
+          summary: "High latency detected"
+          description: "P95 latency is {{ $value }}s (threshold: 1s)"
 
-      # TODO: ====API down alert====
       # Alert when API is not responding
       - alert: APIDown
         expr: up{job="recommendation-api"} == 0
@@ -39,3 +39,31 @@ groups:
         annotations:
           summary: "Recommendation API is down"
           description: "The API has been unreachable for 1 minute"
+
+      # High Request Rate Alert
+      # Trigger when request rate exceeds a threshold (e.g., 1000 req/s)
+      # This could indicate a DDoS attack or unusual traffic
+      # Severity: warning
+
+      - alert: HighRequestRate
+        expr: rate(http_requests_total[1m]) > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unusually high request rate"
+          description: "Request rate is {{ $value }} req/s"
+
+      # Low Request Rate Alert
+      # Trigger when request rate drops below expected minimum
+      # Could indicate service issues or upstream problems
+      # Severity: warning
+      
+      - alert: LowRequestRate
+        expr: rate(http_requests_total[5m]) < 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unusually low request rate"
+          description: "Request rate is {{ $value }} req/s, expected higher traffic"

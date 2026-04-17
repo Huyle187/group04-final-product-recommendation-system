@@ -9,6 +9,7 @@ LRU cache: recent (user, n, type) tuples are cached up to RECOMMENDATION_CACHE_S
 """
 
 import logging
+import time
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -16,7 +17,17 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from app.config import settings
+from app.metrics import (
+    BATCH_SIZE,
+    MODEL_INFO,
+    MODEL_LAST_RELOAD,
+    MODEL_LOADED,
+    PREDICTION_ERRORS,
+    PREDICTION_VALUE,
+)
 
+# Setup logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -66,6 +77,8 @@ class RecommendationModel:
                 "version": self.model_version,
                 "initialized": False,
             }
+            if MODEL_LOADED is not None:
+                MODEL_LOADED.set(0)
             return
 
         try:
@@ -96,6 +109,10 @@ class RecommendationModel:
                 "version": self._model_metadata.get("version", self.model_version),
                 "initialized": True,
             }
+            if MODEL_LOADED is not None:
+                MODEL_LOADED.set(1)
+            if MODEL_LAST_RELOAD is not None:
+                MODEL_LAST_RELOAD.set(time.time())
             logger.info(
                 f"Model loaded: {self._model_metadata.get('n_users', '?')} users, "
                 f"{self._model_metadata.get('n_items', '?')} items, "
@@ -108,6 +125,8 @@ class RecommendationModel:
                 "version": self.model_version,
                 "initialized": False,
             }
+            if MODEL_LOADED is not None:
+                MODEL_LOADED.set(0)
 
     # =========================================================================
     # Public Inference Interface
@@ -159,6 +178,12 @@ class RecommendationModel:
         if len(self.cache) >= settings.RECOMMENDATION_CACHE_SIZE:
             self.cache.popitem(last=False)
         self.cache[cache_key] = recs
+
+        if PREDICTION_VALUE is not None:
+            for rec in recs:
+                PREDICTION_VALUE.labels(model_version=self.model_version).observe(
+                    rec.get("score", 0.0)
+                )
 
         return recs
 

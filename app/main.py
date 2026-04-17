@@ -15,7 +15,7 @@ from typing import Any, Dict, Optional
 from fastapi import FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest, make_asgi_app
 
 from app.config import settings
 from app.explainability import get_explainability_engine
@@ -28,7 +28,7 @@ from app.metrics import (
     http_requests_total,
     http_response_size_bytes,
 )
-from app.middleware import LoggingMiddleware
+from app.middleware import LoggingMiddleware, MetricsMiddleware
 from app.model import get_model
 from app.schemas import (
     ErrorResponse,
@@ -69,6 +69,14 @@ app.add_middleware(
 
 # Add custom logging middleware
 app.add_middleware(LoggingMiddleware)
+
+
+# Add Metrics middleware
+app.add_middleware(MetricsMiddleware)
+
+# Mount Prometheus metrics endpoint
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
 
 
 # ============================================================================
@@ -336,15 +344,7 @@ async def reload_model() -> Dict[str, str]:
 # ============================================================================
 
 
-@app.get("/metrics", tags=["Metrics"])
-async def metrics():
-    """
-    Prometheus metrics endpoint
-
-    Returns all collected metrics for Prometheus to scrape
-    """
-    with RequestMetrics("GET", "/metrics"):
-        return generate_latest()
+# /metrics endpoint is handled by app.mount("/metrics", metrics_app) above
 
 
 # ============================================================================

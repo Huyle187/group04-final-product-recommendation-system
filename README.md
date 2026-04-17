@@ -25,7 +25,13 @@ A real-time product recommendation engine for an e-commerce platform. This syste
 pip install -r requirements.txt
 ```
 
-2. **Start all services**
+2. **Train the Initial Model**
+Before running the services, generate the model bundle (requires `data/events.csv`):
+```bash
+python scripts/train_model.py --dataset ./data --model hybrid
+```
+
+3. **Start all services**
 ```bash
 docker-compose up -d
 ```

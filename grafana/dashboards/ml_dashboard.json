@@ -1,0 +1,132 @@
+{
+  "title": "ML Metrics Dashboard",
+  "uid": "ml-metrics",
+  "timezone": "browser",
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Model Status",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "max(ml_model_loaded) or vector(0)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "Not Loaded", "color": "red" },
+                "1": { "text": "Loaded", "color": "green" }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Average Prediction",
+      "type": "gauge",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum by(le) (rate(ml_prediction_value_bucket[5m])))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "min": 1, "max": 5 }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Prediction Rate",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(ml_predictions_total[5m]))"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Error Rate",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(ml_prediction_errors_total[5m])) or vector(0)"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Prediction Rate Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate(ml_predictions_total[5m]))"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Prediction Latency",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by(le) (rate(ml_prediction_duration_seconds_bucket[5m])))",
+          "legendFormat": "P95"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum by(le) (rate(ml_prediction_duration_seconds_bucket[5m])))",
+          "legendFormat": "P50"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Prediction Value Distribution",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "targets": [
+        {
+          "expr": "sum by (le) (rate(ml_prediction_value_bucket[5m]))",
+          "legendFormat": "{{le}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars"
+          }
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Prediction Errors",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "targets": [
+        {
+          "expr": "sum(rate(ml_prediction_errors_total[5m])) or vector(0)",
+          "legendFormat": "Errors"
+        }
+      ]
+    }
+  ]
+}
