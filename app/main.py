@@ -15,10 +15,7 @@ from typing import Any, Dict, Optional
 from fastapi import FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
-
-from app.middleware import MetricsMiddleware
-from prometheus_client import make_asgi_app
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest, make_asgi_app
 
 from app.config import settings
 from app.explainability import get_explainability_engine
@@ -31,7 +28,7 @@ from app.metrics import (
     http_requests_total,
     http_response_size_bytes,
 )
-from app.middleware import LoggingMiddleware
+from app.middleware import LoggingMiddleware, MetricsMiddleware
 from app.model import get_model
 from app.schemas import (
     ErrorResponse,

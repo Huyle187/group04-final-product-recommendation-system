@@ -12,7 +12,11 @@ from starlette.requests import Request
 from starlette.responses import Response
 from starlette.types import ASGIApp
 
-from app.metrics import http_requests_total, http_request_duration_seconds, RequestMetrics
+from app.metrics import (
+    RequestMetrics,
+    http_request_duration_seconds,
+    http_requests_total,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,11 +57,15 @@ class MetricsMiddleware(BaseHTTPMiddleware):
 
         # TODO: Record the request count metric
         if http_requests_total is not None:
-            http_requests_total.labels(method=method, endpoint=endpoint, status=status).inc()
+            http_requests_total.labels(
+                method=method, endpoint=endpoint, status=status
+            ).inc()
 
         # TODO: Record the request latency metric
         if http_request_duration_seconds is not None:
-            http_request_duration_seconds.labels(method=method, endpoint=endpoint).observe(duration)
+            http_request_duration_seconds.labels(
+                method=method, endpoint=endpoint
+            ).observe(duration)
 
         # TODO 7: Return the response
         return response

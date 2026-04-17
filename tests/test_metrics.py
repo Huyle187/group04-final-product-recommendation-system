@@ -64,7 +64,9 @@ class TestMetricLabels:
 
     def test_request_latency_has_correct_labels(self):
         """Test http_request_duration_seconds has correct labels."""
-        http_request_duration_seconds.labels(method="GET", endpoint="/test").observe(0.1)
+        http_request_duration_seconds.labels(method="GET", endpoint="/test").observe(
+            0.1
+        )
 
 
 class TestMetricsEndpoint:

@@ -9,17 +9,22 @@ LRU cache: recent (user, n, type) tuples are cached up to RECOMMENDATION_CACHE_S
 """
 
 import logging
+import time
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import time
 import numpy as np
 
 from app.config import settings
-from app.metrics import (BATCH_SIZE, MODEL_INFO, MODEL_LAST_RELOAD,
-                         MODEL_LOADED, PREDICTION_ERRORS,
-                         PREDICTION_VALUE)
+from app.metrics import (
+    BATCH_SIZE,
+    MODEL_INFO,
+    MODEL_LAST_RELOAD,
+    MODEL_LOADED,
+    PREDICTION_ERRORS,
+    PREDICTION_VALUE,
+)
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -176,7 +181,9 @@ class RecommendationModel:
 
         if PREDICTION_VALUE is not None:
             for rec in recs:
-                PREDICTION_VALUE.labels(model_version=self.model_version).observe(rec.get("score", 0.0))
+                PREDICTION_VALUE.labels(model_version=self.model_version).observe(
+                    rec.get("score", 0.0)
+                )
 
         return recs
 
@@ -345,9 +352,9 @@ class RecommendationModel:
             hybrid_score = w_c * data["collab_score"] + w_cb * data["content_score"]
             rec = dict(data["rec"])
             rec["score"] = min(1.0, max(0.0, hybrid_score))
-            rec["reason"] = (
-                "Recommended based on your browsing patterns and similar item features"
-            )
+            rec[
+                "reason"
+            ] = "Recommended based on your browsing patterns and similar item features"
             scored.append(rec)
 
         scored.sort(key=lambda x: x["score"], reverse=True)
