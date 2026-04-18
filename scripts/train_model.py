@@ -60,13 +60,13 @@ class ModelTrainer:
         # Model artifacts (populated by train_* methods)
         self.user_factors: Optional[np.ndarray] = None  # (n_users, n_components)
         self.item_factors: Optional[np.ndarray] = None  # (n_items, n_components)
-        self.ease_B: Optional[
-            np.ndarray
-        ] = None  # (n_active, n_active) EASE weight matrix
+        self.ease_B: Optional[np.ndarray] = (
+            None  # (n_active, n_active) EASE weight matrix
+        )
         self.ease_active_indices: Optional[np.ndarray] = None  # indices into item space
-        self.item_similarity_matrix: Optional[
-            np.ndarray
-        ] = None  # (n_items, n_items) float32
+        self.item_similarity_matrix: Optional[np.ndarray] = (
+            None  # (n_items, n_items) float32
+        )
         self.user_id_to_idx: Dict[str, int] = {}
         self.item_id_to_idx: Dict[str, int] = {}
         self.idx_to_user_id: Dict[int, str] = {}

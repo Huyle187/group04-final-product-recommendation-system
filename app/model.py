@@ -366,9 +366,9 @@ class RecommendationModel:
             hybrid_score = w_c * data["collab_score"] + w_cb * data["content_score"]
             rec = dict(data["rec"])
             rec["score"] = min(1.0, max(0.0, hybrid_score))
-            rec[
-                "reason"
-            ] = "Recommended based on your browsing patterns and similar item features"
+            rec["reason"] = (
+                "Recommended based on your browsing patterns and similar item features"
+            )
             scored.append(rec)
 
         scored.sort(key=lambda x: x["score"], reverse=True)
