@@ -22,7 +22,6 @@ from app.metrics import (
     MODEL_INFO,
     MODEL_LAST_RELOAD,
     MODEL_LOADED,
-    PREDICTION_ERRORS,
     PREDICTION_VALUE,
 )
 

@@ -40,7 +40,7 @@
         }
       ],
       "fieldConfig": {
-        "defaults": { "min": 1, "max": 5 }
+        "defaults": { "min": 0, "max": 1 }
       }
     },
     {
@@ -61,7 +61,20 @@
       "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
       "targets": [
         {
-          "expr": "sum(rate(ml_prediction_errors_total[5m])) or vector(0)"
+          "expr": "sum(rate(ml_predictions_total{status=\"error\"}[5m])) or vector(0)"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Model Characteristics & Information",
+      "type": "table",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 4 },
+      "targets": [
+        {
+          "expr": "ml_model_info",
+          "format": "table",
+          "instant": true
         }
       ]
     },
@@ -69,7 +82,7 @@
       "id": 5,
       "title": "Prediction Rate Over Time",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
       "targets": [
         {
           "expr": "sum(rate(ml_predictions_total[5m]))"
@@ -80,7 +93,7 @@
       "id": 6,
       "title": "Prediction Latency",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum by(le) (rate(ml_prediction_duration_seconds_bucket[5m])))",
@@ -101,7 +114,7 @@
       "id": 7,
       "title": "Prediction Value Distribution",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
       "targets": [
         {
           "expr": "sum by (le) (rate(ml_prediction_value_bucket[5m]))",
@@ -120,10 +133,10 @@
       "id": 8,
       "title": "Prediction Errors",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
       "targets": [
         {
-          "expr": "sum(rate(ml_prediction_errors_total[5m])) or vector(0)",
+          "expr": "sum(rate(ml_predictions_total{status=\"error\"}[5m])) or vector(0)",
           "legendFormat": "Errors"
         }
       ]
