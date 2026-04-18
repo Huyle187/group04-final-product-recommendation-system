@@ -2,7 +2,7 @@
   "title": "ML Metrics Dashboard",
   "uid": "ml-metrics",
   "timezone": "browser",
-  "refresh": "10s",
+  "refresh": "5s",
   "schemaVersion": 38,
   "panels": [
     {
@@ -36,7 +36,8 @@
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.5, sum by(le) (rate(ml_prediction_value_bucket[5m])))"
+          "expr": "clamp_min(histogram_quantile(0.5, sum by(le) (rate(ml_prediction_value_bucket[1m]))), 0)",
+          "intervalMs": 1000
         }
       ],
       "fieldConfig": {

@@ -1,0 +1,30 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'severity']
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 1h
+  receiver: 'blackhole'     # Receiver chỉ hiển thị trên UI, không gửi đi đâu
+
+  routes:
+    - match:
+        severity: critical
+      receiver: 'blackhole'
+      group_wait: 5s
+    - match:
+        severity: warning
+      receiver: 'blackhole'
+
+receivers:
+  # Receiver rỗng: Alert vẫn xuất hiện đầy đủ trên UI http://localhost:9093
+  # Không cần Slack/Email thật vẫn thấy được Alert trên dashboard
+  - name: 'blackhole'
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname']

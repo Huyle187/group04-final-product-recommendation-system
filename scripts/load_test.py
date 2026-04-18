@@ -96,7 +96,8 @@ def load_test_with_requests(
     start_time = time.time()
 
     if concurrent:
-        with ThreadPoolExecutor(max_workers=10) as executor:
+        # Tự động Scale số nòng súng (workers) tương ứng với số User (tối đa 100 luồng)
+        with ThreadPoolExecutor(max_workers=min(num_users, 100)) as executor:
             futures = []
             for user_id in range(num_users):
                 for _ in range(requests_per_user):
