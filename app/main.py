@@ -365,13 +365,19 @@ async def explain_recommendation(
             "all: returns all four methods combined."
         ),
     ),
+    top_k: int = Query(
+        5,
+        ge=1,
+        le=50,
+        description="Number of top contributing items/dimensions to return (default 5, max 50).",
+    ),
 ) -> Dict[str, Any]:
     """
     Explain why a specific product was recommended to a user.
 
     Methods:
     - **auto**: SHAP when model is loaded, otherwise collaborative neighbor-based
-    - **collaborative**: Nearest-neighbor — shows similar users who interacted with this item
+    - **collaborative**: EASE co-occurrence — shows history items with strongest weight toward this product
     - **content_based**: Feature similarity — shows most similar items from user history
     - **shap**: Exact latent-factor SHAP. score = Σ SHAP_j where SHAP_j = u_j * i_j.
       Returns top-k dimensions and representative catalog items per dimension.
@@ -382,7 +388,7 @@ async def explain_recommendation(
     with RequestMetrics("GET", "/recommendations/{user_id}/explain"):
         try:
             engine = get_explainability_engine()
-            explanation = engine.explain(user_id, product_id, method)
+            explanation = engine.explain(user_id, product_id, method, top_k=top_k)
             return explanation
         except Exception as e:
             logger.error(
