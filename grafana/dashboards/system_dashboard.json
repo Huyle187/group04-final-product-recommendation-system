@@ -17,7 +17,7 @@
       },
       "targets": [
         {
-          "expr": "sum by(method, endpoint) (rate(http_requests_total[5m]))",
+          "expr": "sum by(method, endpoint) (rate(http_requests_total{endpoint!=\"/metrics\"}[5m]))",
           "legendFormat": "{{method}} {{endpoint}}"
         }
       ]
@@ -95,7 +95,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (endpoint) (rate(http_requests_total[5m]))",
+          "expr": "sum by (endpoint) (rate(http_requests_total{endpoint!=\"/metrics\"}[5m]))",
           "format": "table",
           "instant": true
         }

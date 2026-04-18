@@ -26,7 +26,7 @@ groups:
       - alert: PredictionLatencyHigh
         expr: |
           histogram_quantile(0.95, 
-            rate(ml_prediction_duration_seconds_bucket[5m])
+            sum by (le) (rate(ml_prediction_duration_seconds_bucket[5m]))
           ) > 0.1
         for: 5m
         labels:
@@ -57,15 +57,15 @@ groups:
       - alert: PredictionDistributionAnomaly
         expr: |
           abs(
-            histogram_quantile(0.5, rate(ml_prediction_value_bucket[1h])) -
-            histogram_quantile(0.5, rate(ml_prediction_value_bucket[1h] offset 24h))
-          ) > 0.5
+            histogram_quantile(0.5, sum by (le) (rate(ml_prediction_value_bucket[1h]))) -
+            histogram_quantile(0.5, sum by (le) (rate(ml_prediction_value_bucket[1h] offset 24h)))
+          ) > 0.1
         for: 30m
         labels:
           severity: warning
         annotations:
           summary: "Prediction distribution shift detected"
-          description: "Median prediction has shifted by more than 0.5 in 24h"
+          description: "Median prediction has shifted by more than 0.1 in 24h"
 
       # Model Stale Alert
       # Trigger when model hasn't been reloaded in a long time (e.g., 7 days)
@@ -96,7 +96,7 @@ groups:
       # Alert when model inference is slow
       - alert: SlowModelInference
         expr: |
-          histogram_quantile(0.95, rate(ml_prediction_duration_seconds_bucket[5m])) > 0.5
+          histogram_quantile(0.95, sum by (le) (rate(ml_prediction_duration_seconds_bucket[5m]))) > 0.5
         for: 5m
         labels:
           severity: warning

@@ -48,26 +48,14 @@ from prometheus_client import Counter, Gauge, Histogram, Info
 
 # TODO 5: Define prediction value histogram
 # This histogram should track the distribution of prediction values
-# For movie ratings, use buckets: [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]
 
 PREDICTION_VALUE = Histogram(
     "ml_prediction_value",
     "Distribution of prediction values",
     ["model_version"],
-    buckets=[1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0],
+    buckets=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
 )
 
-
-# TODO 6: Define prediction error counter
-# This counter should track prediction errors with labels for:
-# - error_type: Type of error (validation_error, model_error, unknown_error)
-# - model_version: Version of the model
-
-PREDICTION_ERRORS = Counter(
-    "ml_prediction_errors_total",
-    "Total number of prediction errors",
-    ["error_type", "model_version"],
-)
 
 
 # ============================================================================
@@ -179,7 +167,6 @@ def get_all_metrics():
         "prediction_count": ml_predictions_total,
         "prediction_latency": ml_prediction_duration_seconds,
         "prediction_value": PREDICTION_VALUE,
-        "prediction_errors": PREDICTION_ERRORS,
         "model_loaded": MODEL_LOADED,
         "model_info": MODEL_INFO,
         "model_last_reload": MODEL_LAST_RELOAD,
