@@ -46,13 +46,15 @@ groups:
       # Severity: warning
 
       - alert: HighRequestRate
-        expr: rate(http_requests_total[1m]) > 1000
-        for: 5m
+        # Ngưỡng 500 req/s: phù hợp với throughput thực tế ~750 req/s của hệ thống
+        # for: 30s để Alert FIRE nhanh khi demo (đủ để AlertManager nhận)
+        expr: sum(rate(http_requests_total{endpoint!="/metrics"}[1m])) > 500
+        for: 30s
         labels:
           severity: warning
         annotations:
-          summary: "Unusually high request rate"
-          description: "Request rate is {{ $value }} req/s"
+          summary: "High request rate detected"
+          description: "Request rate is {{ $value | humanize }} req/s (threshold: 500)."
 
       # Low Request Rate Alert
       # Trigger when request rate drops below expected minimum
@@ -60,10 +62,12 @@ groups:
       # Severity: warning
       
       - alert: LowRequestRate
-        expr: rate(http_requests_total[5m]) < 0.1
-        for: 10m
+        # Dùng [2m] thay vì [5m] để phản ứng nhanh hơn khi traffic dừng
+        # for: 3m thay vì 10m để resolve/fire nhanh hơn khi demo
+        expr: sum(rate(http_requests_total{endpoint!="/metrics"}[2m])) < 0.1
+        for: 3m
         labels:
           severity: warning
         annotations:
           summary: "Unusually low request rate"
-          description: "Request rate is {{ $value }} req/s, expected higher traffic"
+          description: "Request rate is {{ $value | humanize }} req/s - system may be idle or down"

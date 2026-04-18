@@ -72,8 +72,12 @@ services:
     container_name: alertmanager
     ports:
       - "9093:9093"
+    volumes:
+      - ./prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     command:
       - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--log.level=info'
     networks:
       - recommendation-net
     restart: unless-stopped
