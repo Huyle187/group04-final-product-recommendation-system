@@ -76,6 +76,10 @@ def mock_model():
     sim = model.item_factors @ model.item_factors.T
     model.item_similarity_matrix = sim.astype(np.float32)
 
+    # Explicitly None so MagicMock doesn't auto-create a truthy Mock object
+    model.ease_B = None
+    model.ease_active_indices = None
+
     return model
 
 
