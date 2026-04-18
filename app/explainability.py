@@ -64,22 +64,25 @@ class ExplainabilityEngine:
         user_id: str,
         product_id: str,
         n_neighbors: int = 5,
+        top_k: int = 5,
     ) -> Dict[str, Any]:
         """
-        Explain a collaborative filtering recommendation via nearest-neighbor evidence.
+        Explain a collaborative filtering recommendation.
 
-        Finds the top-N most similar users (cosine similarity in the latent space),
-        reports how many interacted with the recommended product, and lists
-        supporting items those neighbors also interacted with.
+        When EASE is available: shows which items in the user's history have the
+        strongest co-occurrence weight with the recommended product (EASE item-item
+        weights), and the EASE score contribution per history item.
+
+        Falls back to SVD neighbor-based explanation when EASE is not available:
+        finds similar users and reports how many interacted with the product.
 
         Args:
             user_id: Target user
             product_id: Recommended product to explain
-            n_neighbors: Number of similar users to inspect
+            n_neighbors: Number of similar users to inspect (SVD fallback only)
 
         Returns:
-            Dict with method, similar_user_count, confidence, supporting_items,
-            explanation_text
+            Dict with method, supporting evidence, confidence, explanation_text
         """
         m = self.model
 
@@ -108,7 +111,87 @@ class ExplainabilityEngine:
         u_idx = m.user_id_to_idx[user_id]
         item_idx = m.item_id_to_idx[product_id]
 
-        # Cosine similarity to all users (factors are L2-normalized)
+        # --- EASE-based explanation (primary path) ---
+        if m.ease_B is not None and m.ease_active_indices is not None:
+            # ease_active_indices maps positions in ease_B to global item indices
+            active_set = set(m.ease_active_indices.tolist())
+
+            if item_idx not in active_set:
+                return {
+                    "method": "ease_cooccurrence",
+                    "user_id": user_id,
+                    "product_id": product_id,
+                    "error": "Product is outside the EASE active item set",
+                }
+
+            # Position of the target item within ease_active_indices
+            active_list = m.ease_active_indices.tolist()
+            active_pos_map = {
+                global_idx: pos for pos, global_idx in enumerate(active_list)
+            }
+            target_active_pos = active_pos_map[item_idx]
+
+            # Items in the user's history that are also in the EASE active set
+            seen_global = m.interaction_matrix[u_idx].nonzero()[1]
+            seen_active_positions = [
+                active_pos_map[gi] for gi in seen_global if gi in active_pos_map
+            ]
+
+            if not seen_active_positions:
+                return {
+                    "method": "ease_cooccurrence",
+                    "user_id": user_id,
+                    "product_id": product_id,
+                    "explanation_text": (
+                        "None of the user's history items overlap with the EASE "
+                        "active item set. Recommendation may use popularity fallback."
+                    ),
+                }
+
+            # EASE weight from each history item to the target item
+            # ease_B[history_pos, target_pos] is the item-item co-occurrence weight
+            weights = m.ease_B[
+                seen_active_positions, target_active_pos
+            ]  # (n_seen_active,)
+
+            # Sort by absolute weight (strongest contributors first)
+            top_k = min(top_k, len(seen_active_positions))
+            top_pos = np.argsort(np.abs(weights))[::-1][:top_k]
+
+            supporting_items = []
+            total_score = 0.0
+            for pos in top_pos:
+                global_idx = active_list[seen_active_positions[pos]]
+                hist_item_id = m.idx_to_item_id.get(global_idx)
+                w = float(weights[pos])
+                total_score += w
+                if hist_item_id:
+                    supporting_items.append(
+                        {
+                            "item_id": hist_item_id,
+                            "ease_weight": round(w, 6),
+                            "category": m.item_categories.get(hist_item_id),
+                        }
+                    )
+
+            confidence = min(1.0, max(0.0, total_score)) if total_score > 0 else 0.0
+
+            return {
+                "method": "ease_cooccurrence",
+                "user_id": user_id,
+                "product_id": product_id,
+                "history_items_checked": len(seen_active_positions),
+                "top_contributing_history_items": supporting_items,
+                "ease_score_contribution": round(total_score, 6),
+                "confidence": round(confidence, 4),
+                "explanation_text": (
+                    f"Recommended because {len(supporting_items)} item(s) in your "
+                    f"browsing history co-occur strongly with this product "
+                    f"(EASE score contribution: {total_score:.4f})."
+                ),
+            }
+
+        # --- SVD neighbor-based explanation (fallback when EASE not available) ---
         user_vec = m.user_factors[u_idx]  # (n_components,)
         all_sims = m.user_factors @ user_vec  # (n_users,)
         all_sims[u_idx] = -1.0  # exclude self
@@ -122,13 +205,13 @@ class ExplainabilityEngine:
                 neighbors_with_item.append(int(n_idx))
 
         # Collect supporting items from those neighbors (items they also bought)
-        supporting_items: set = set()
+        supporting_items_set: set = set()
         for n_idx in neighbors_with_item:
             neighbor_item_indices = m.interaction_matrix[n_idx].nonzero()[1]
             for ni in neighbor_item_indices[:5]:
                 ni_id = m.idx_to_item_id.get(ni)
                 if ni_id and ni_id != product_id:
-                    supporting_items.add(ni_id)
+                    supporting_items_set.add(ni_id)
 
         confidence = len(neighbors_with_item) / n_neighbors if n_neighbors > 0 else 0.0
 
@@ -139,7 +222,7 @@ class ExplainabilityEngine:
             "similar_user_count": len(neighbors_with_item),
             "top_n_neighbors_checked": n_neighbors,
             "confidence": round(confidence, 3),
-            "supporting_items": list(supporting_items)[:5],
+            "supporting_items": list(supporting_items_set)[:5],
             "explanation_text": (
                 f"{len(neighbors_with_item)} out of {n_neighbors} users with "
                 f"similar browsing history also interacted with this item."
@@ -499,6 +582,7 @@ class ExplainabilityEngine:
         user_id: str,
         product_id: str,
         method: str = "auto",
+        top_k: int = 5,
     ) -> Dict[str, Any]:
         """
         Generate an explanation for why product_id was recommended to user_id.
@@ -516,17 +600,19 @@ class ExplainabilityEngine:
         m = self.model
 
         if method == "shap":
-            return self.explain_shap(user_id, product_id)
+            return self.explain_shap(user_id, product_id, top_k=top_k)
 
         if method == "lime":
-            return self.explain_lime(user_id, product_id)
+            return self.explain_lime(user_id, product_id, top_k=top_k)
 
         if method == "all":
             return {
-                "collaborative": self.explain_collaborative(user_id, product_id),
+                "collaborative": self.explain_collaborative(
+                    user_id, product_id, top_k=top_k
+                ),
                 "content_based": self.explain_content_based(user_id, product_id),
-                "shap": self.explain_shap(user_id, product_id),
-                "lime": self.explain_lime(user_id, product_id),
+                "shap": self.explain_shap(user_id, product_id, top_k=top_k),
+                "lime": self.explain_lime(user_id, product_id, top_k=top_k),
             }
 
         if method == "content_based":
@@ -536,8 +622,8 @@ class ExplainabilityEngine:
         if m.user_factors is not None:
             if method == "auto":
                 # Default to SHAP when model is loaded — more informative
-                return self.explain_shap(user_id, product_id)
-            return self.explain_collaborative(user_id, product_id)
+                return self.explain_shap(user_id, product_id, top_k=top_k)
+            return self.explain_collaborative(user_id, product_id, top_k=top_k)
 
         return self.explain_content_based(user_id, product_id)
 
